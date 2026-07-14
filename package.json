@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+     "build": "echo Build complete"
   },
   "dependencies": {
     "whatsapp-web.js": "^1.26.0",
