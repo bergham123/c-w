@@ -1,0 +1,44 @@
+name: WhatsApp Automation
+
+on:
+  schedule:
+    - cron: '0 9 * * *'   # هذا السطر سيتم تعديله بواسطة الكود
+  workflow_dispatch:
+  
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgbm-dev
+
+      - name: Install Node dependencies
+        run: npm install
+
+      - name: Run WhatsApp bot
+        run: npm start
+
+      - name: Commit updated files
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          # نضيف فقط الملفات الموجودة (نتجاهل الأخطاء)
+          git add --ignore-errors session dashboard aggregate.json logs
+          git commit -m "update session, dashboard & logs $(date +'%Y-%m-%d %H:%M')" || echo "No changes to commit"
+          git push

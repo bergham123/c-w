@@ -1,0 +1,19 @@
+name = "whatsapp-dashboard"
+main = "functions/_worker.js"   # إذا أردت استخدام _worker.js بدلاً من المجلد api
+compatibility_date = "2024-01-01"
+
+# متغيرات البيئة (ستُضاف أيضاً في لوحة Cloudflare)
+[vars]
+GITHUB_TOKEN = "your_token_here"
+OWNER = "bergham123"
+REPO = "whatsapp"
+JWT_SECRET = "your_secret_here"
+
+# إعدادات النشر
+[build]
+command = ""
+cwd = ""
+watch_dir = "dashboard"
+
+[build.upload]
+format = "modules"
