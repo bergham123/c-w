@@ -5,6 +5,10 @@ export function createGitHubClient(env) {
     const REPO = env.REPO;
     const API = `https://api.github.com/repos/${OWNER}/${REPO}`;
 
+    // Cloudflare Web APIs for Base64 encoding/decoding (supports UTF-8)
+    const encodeBase64 = (str) => btoa(unescape(encodeURIComponent(str)));
+    const decodeBase64 = (str) => decodeURIComponent(escape(atob(str.replace(/\n/g, ''))));
+
     async function getFile(path) {
         const res = await fetch(`${API}/contents/${path}`, {
             headers: {
@@ -14,13 +18,13 @@ export function createGitHubClient(env) {
         });
         if (!res.ok) throw new Error("Cannot read " + path);
         const file = await res.json();
-        const content = Buffer.from(file.content, "base64").toString("utf8");
+        const content = decodeBase64(file.content);
         return { sha: file.sha, data: JSON.parse(content) };
     }
 
     async function updateFile(path, json, message = "Update File") {
         const current = await getFile(path);
-        const content = Buffer.from(JSON.stringify(json, null, 2)).toString("base64");
+        const content = encodeBase64(JSON.stringify(json, null, 2));
         const res = await fetch(`${API}/contents/${path}`, {
             method: "PUT",
             headers: {
@@ -76,13 +80,13 @@ export function createGitHubClient(env) {
         });
         if (!res.ok) throw new Error(`Cannot read ${path}`);
         const data = await res.json();
-        const content = Buffer.from(data.content, 'base64').toString('utf8');
+        const content = decodeBase64(data.content);
         return { sha: data.sha, content };
     }
 
     async function updateRawFile(path, content, message = "Update file") {
         const current = await getRawFile(path);
-        const base64 = Buffer.from(content, 'utf8').toString('base64');
+        const base64 = encodeBase64(content);
         const res = await fetch(`${API}/contents/${path}`, {
             method: "PUT",
             headers: {
