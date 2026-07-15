@@ -14,28 +14,17 @@ export async function onRequest(context) {
     }
 
     const github = createGitHubClient(env);
-    let users = [];
+    let users = await github.getUsers(); // ترجع [] إذا غاب الملف
 
-    // حاول قراءة users.json، وإن لم يجد أنشئه بمستخدم افتراضي
-    try {
-      const file = await github.getFile('users.json');
-      users = file.data;
-    } catch (error) {
-      // إذا كان الملف غير موجود، أنشئ مستخدم افتراضي
-      const defaultUser = {
+    if (!users || users.length === 0) {
+      // أنشئ مستخدم افتراضي
+      users = [{
         username: 'admin',
         email: 'admin@example.com',
-        password: 'admin123', // كلمة مرور نص عادي
+        password: 'admin123',
         createdAt: new Date().toISOString()
-      };
-      users = [defaultUser];
-      // احفظ الملف في GitHub
-      await github.updateFile('users.json', users, 'Create default users.json');
-    }
-
-    // تأكد من أن users مصفوفة
-    if (!Array.isArray(users)) {
-      users = [];
+      }];
+      await github.saveUsers(users);
     }
 
     const user = users.find(u => u.email === email);
