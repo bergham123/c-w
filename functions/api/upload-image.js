@@ -24,7 +24,9 @@ export async function onRequest(context) {
             headers: { 'Content-Type': 'application/json' }
         });
     } catch (error) {
-        console.error('Upload image error:', error);
-        return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 }
