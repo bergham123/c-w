@@ -3,15 +3,12 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-     "build": "echo Build complete"
+    "start": "node index.js"
   },
   "dependencies": {
     "whatsapp-web.js": "^1.26.0",
     "qrcode-terminal": "^0.12.0",
     "fs-extra": "^11.2.0",
-    "jsonwebtoken": "^9.0.0",
-    "bcryptjs": "^2.4.3",
-    "node-fetch": "^3.3.2"
+    "jose": "^5.2.0"
   }
 }
