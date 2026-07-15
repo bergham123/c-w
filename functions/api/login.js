@@ -1,6 +1,6 @@
 import { createGitHubClient } from './github.js';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import { SignJWT } from 'jose';
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -32,11 +32,12 @@ export async function onRequest(context) {
       return new Response(JSON.stringify({ error: 'Invalid credentials' }), { status: 401 });
     }
 
-    const token = jwt.sign(
-      { email: user.email, username: user.username },
-      env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+    // Generate token using jose
+    const secret = new TextEncoder().encode(env.JWT_SECRET);
+    const token = await new SignJWT({ email: user.email, username: user.username })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setExpirationTime('24h')
+      .sign(secret);
 
     return new Response(JSON.stringify({
       success: true,
