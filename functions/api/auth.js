@@ -1,38 +1,145 @@
-import { jwtVerify } from 'jose';
+export function createGitHubClient(env) {
+    const TOKEN = env.GITHUB_TOKEN;
+    const OWNER = env.OWNER;
+    const REPO = env.REPO;
+    const API = `https://api.github.com/repos/${OWNER}/${REPO}`;
 
-export async function onRequest(context) {
-  const { request, env } = context;
-
-  try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'No token provided' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    async function getFile(path) {
+        const res = await fetch(`${API}/contents/${path}`, {
+            headers: {
+                Authorization: `Bearer ${TOKEN}`,
+                Accept: "application/vnd.github+json"
+            }
+        });
+        if (!res.ok) throw new Error("Cannot read " + path);
+        const file = await res.json();
+        const content = atob(file.content); // استعمال atob بدل Buffer
+        return { sha: file.sha, data: JSON.parse(content) };
     }
 
-    const token = authHeader.split(' ')[1];
-    const secret = new TextEncoder().encode(env.JWT_SECRET);
-    
-    // Verify the token using jose
-    const { payload } = await jwtVerify(token, secret);
+    async function updateFile(path, json, message = "Update File") {
+        const current = await getFile(path);
+        const content = btoa(JSON.stringify(json, null, 2));
+        const res = await fetch(`${API}/contents/${path}`, {
+            method: "PUT",
+            headers: {
+                Authorization: `Bearer ${TOKEN}`,
+                Accept: "application/vnd.github+json"
+            },
+            body: JSON.stringify({
+                message,
+                content,
+                sha: current.sha
+            })
+        });
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(err);
+        }
+        return await res.json();
+    }
 
-    return new Response(JSON.stringify({
-      valid: true,
-      user: {
-        email: payload.email,
-        username: payload.username
-      }
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    console.error('Auth error:', error);
-    return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
+    async function runWorkflow(workflow = "send.yaml") {
+        const res = await fetch(`${API}/actions/workflows/${workflow}/dispatches`, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${TOKEN}`,
+                Accept: "application/vnd.github+json"
+            },
+            body: JSON.stringify({ ref: "main" })
+        });
+        if (!res.ok) throw new Error("Workflow Error");
+        return true;
+    }
+
+    async function getUsers() {
+        try {
+            const file = await getFile("users.json");
+            return file.data;
+        } catch (error) {
+            if (error.message.includes("Cannot read")) return [];
+            throw error;
+        }
+    }
+
+    async function saveUsers(users) {
+        return await updateFile("users.json", users, "Update users");
+    }
+
+    async function getRawFile(path) {
+        const res = await fetch(`${API}/contents/${path}`, {
+            headers: {
+                Authorization: `Bearer ${TOKEN}`,
+                Accept: "application/vnd.github.v3+json"
+            }
+        });
+        if (!res.ok) throw new Error(`Cannot read ${path}`);
+        const data = await res.json();
+        const content = atob(data.content);
+        return { sha: data.sha, content };
+    }
+
+    async function updateRawFile(path, content, message = "Update file") {
+        const current = await getRawFile(path);
+        const base64 = btoa(content);
+        const res = await fetch(`${API}/contents/${path}`, {
+            method: "PUT",
+            headers: {
+                Authorization: `Bearer ${TOKEN}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message,
+                content: base64,
+                sha: current.sha
+            })
+        });
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(err);
+        }
+        return await res.json();
+    }
+
+    async function uploadFileRaw(path, contentBase64, message = "Upload file") {
+        let sha = null;
+        try {
+            const res = await fetch(`${API}/contents/${path}`, {
+                headers: { Authorization: `Bearer ${TOKEN}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                sha = data.sha;
+            }
+        } catch (e) {}
+        const body = {
+            message,
+            content: contentBase64,
+            ...(sha && { sha })
+        };
+        const res = await fetch(`${API}/contents/${path}`, {
+            method: 'PUT',
+            headers: {
+                Authorization: `Bearer ${TOKEN}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(err);
+        }
+        return await res.json();
+    }
+
+    return {
+        getFile,
+        updateFile,
+        runWorkflow,
+        getUsers,
+        saveUsers,
+        getRawFile,
+        updateRawFile,
+        uploadFileRaw
+    };
 }
