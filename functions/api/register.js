@@ -20,9 +20,19 @@ export async function onRequest(context) {
 
     const github = createGitHubClient(env);
     let users = [];
+
+    // حاول قراءة users.json، وإن لم يجد ابدأ بمصفوفة فارغة
     try {
-      users = await github.getUsers();
-    } catch (e) {}
+      const file = await github.getFile('users.json');
+      users = file.data;
+    } catch (error) {
+      // الملف غير موجود، نبدا بمصفوفة فارغة
+      users = [];
+    }
+
+    if (!Array.isArray(users)) {
+      users = [];
+    }
 
     if (users.find(u => u.email === email)) {
       return new Response(JSON.stringify({ error: 'Email already registered' }), { status: 400 });
@@ -31,11 +41,11 @@ export async function onRequest(context) {
     users.push({
       username,
       email,
-      password, // مخزنة كنص عادي
+      password, // نص عادي
       createdAt: new Date().toISOString()
     });
 
-    await github.saveUsers(users);
+    await github.updateFile('users.json', users, 'Update users');
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
