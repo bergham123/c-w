@@ -1,5 +1,4 @@
 import { createGitHubClient } from './github.js';
-import bcrypt from 'bcryptjs';
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -23,17 +22,16 @@ export async function onRequest(context) {
     let users = [];
     try {
       users = await github.getUsers();
-    } catch (e) { }
+    } catch (e) {}
 
     if (users.find(u => u.email === email)) {
       return new Response(JSON.stringify({ error: 'Email already registered' }), { status: 400 });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
     users.push({
       username,
       email,
-      password: hashedPassword,
+      password, // مخزنة كنص عادي
       createdAt: new Date().toISOString()
     });
 
