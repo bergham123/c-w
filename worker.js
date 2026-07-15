@@ -1,10 +1,12 @@
 /**
- * Cloudflare Worker - GitHub Manager Pro (بدون مصادقة)
+ * Cloudflare Worker - GitHub Manager Pro
  * --------------------------------------
  * - Messages: Load / Edit / Save
  * - Contacts: Load / Edit / Save
  * - Images: Preview & Upload to images/
  * - Logs: View logs from /logs/ folder
+ * - Schedule: Add/Remove/Update cron schedule
+ * - Statistics: View aggregate.json as table + chart
  * - Run Workflow: Trigger GitHub Actions
  */
 
@@ -44,7 +46,7 @@ async function githubGetFile(env, path) {
   const url = "https://api.github.com/repos/" + env.GITHUB_OWNER + "/" + env.GITHUB_REPO + "/contents/" + encodeURIComponent(path) + "?ref=" + branch;
   const res = await fetch(url, { headers: ghHeaders(env) });
   if (res.status === 404) {
-    return { content: "[]", sha: null, exists: false };
+    return { content: null, sha: null, exists: false };
   }
   if (!res.ok) {
     throw new Error("GitHub GET error " + res.status + ": " + await res.text());
@@ -172,6 +174,139 @@ async function handleGetLogContent(request, env) {
   }
 }
 
+// ========== دوال الجدولة (Schedule) ==========
+// قراءة ملف YAML واستخراج cron
+function extractCron(yamlText) {
+  if (!yamlText) return null;
+  const match = yamlText.match(/-\s*cron:\s*'([^']*)'/);
+  return match ? match[1] : null;
+}
+
+// التحقق من وجود قسم schedule
+function hasSchedule(yamlText) {
+  if (!yamlText) return false;
+  return /schedule:/.test(yamlText);
+}
+
+// إضافة أو تحديث cron في ملف YAML
+function setCron(yamlText, newCron) {
+  if (!yamlText) {
+    // إذا كان الملف فارغاً، أنشئ القسم الأساسي
+    return "on:\n  schedule:\n    - cron: '" + newCron + "'\n  workflow_dispatch:";
+  }
+  
+  // إذا كان يوجد schedule، استبدل cron
+  if (hasSchedule(yamlText)) {
+    if (/- cron:/.test(yamlText)) {
+      return yamlText.replace(/-\s*cron:\s*'[^']*'/, "- cron: '" + newCron + "'");
+    } else {
+      // يوجد schedule لكن لا يوجد cron (حالة نادرة)
+      return yamlText.replace(/schedule:/, "schedule:\n    - cron: '" + newCron + "'");
+    }
+  } else {
+    // لا يوجد schedule، أضفه بعد on:
+    return yamlText.replace(/^on:/, "on:\n  schedule:\n    - cron: '" + newCron + "'");
+  }
+}
+
+// حذف قسم schedule بالكامل
+function removeSchedule(yamlText) {
+  if (!yamlText) return yamlText;
+  // إزالة الأسطر المتعلقة بـ schedule و cron
+  const lines = yamlText.split("\n");
+  let inSchedule = false;
+  const result = [];
+  for (let line of lines) {
+    if (/^\s*schedule:/.test(line)) {
+      inSchedule = true;
+      continue;
+    }
+    if (inSchedule && /^\s*-\s*cron:/.test(line)) {
+      continue;
+    }
+    if (inSchedule && /^\s*workflow_dispatch:/.test(line)) {
+      inSchedule = false;
+      result.push(line);
+      continue;
+    }
+    if (inSchedule && /^\s*\S/.test(line) && !/^\s*workflow_dispatch:/.test(line)) {
+      // بداية قسم جديد، ننهي الـ schedule
+      inSchedule = false;
+      result.push(line);
+      continue;
+    }
+    if (!inSchedule) {
+      result.push(line);
+    }
+  }
+  return result.join("\n");
+}
+
+async function handleLoadSchedule(request, env) {
+  try {
+    const path = getWorkflowPath(env);
+    const { content, exists } = await githubGetFile(env, path);
+    if (!exists || !content) {
+      return jsonResponse({ ok: true, cron: null, hasSchedule: false });
+    }
+    const cron = extractCron(content);
+    const hasSched = hasSchedule(content);
+    return jsonResponse({ ok: true, cron: cron, hasSchedule: hasSched });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: String(err.message || err) }, 500);
+  }
+}
+
+async function handleSaveSchedule(request, env) {
+  try {
+    const body = await request.json();
+    const { action, cron } = body; // action: 'add', 'update', 'remove'
+    const path = getWorkflowPath(env);
+    const current = await githubGetFile(env, path);
+    let yamlContent = current.content || "";
+    
+    if (action === 'remove') {
+      yamlContent = removeSchedule(yamlContent);
+    } else if (action === 'add' || action === 'update') {
+      if (!cron || !/^\S+\s+\S+\s+\S+\s+\S+\s+\S+$/.test(cron)) {
+        return jsonResponse({ ok: false, error: "cron must have 5 space-separated fields" }, 400);
+      }
+      yamlContent = setCron(yamlContent, cron);
+    } else {
+      return jsonResponse({ ok: false, error: "Invalid action" }, 400);
+    }
+    
+    const result = await githubPutFile(
+      env,
+      path,
+      yamlContent,
+      current.sha,
+      "Update schedule via web editor"
+    );
+    return jsonResponse({ ok: true, commit: result.commit && result.commit.sha });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: String(err.message || err) }, 500);
+  }
+}
+
+// ========== دوال الإحصائيات (Statistics) ==========
+async function handleGetStats(request, env) {
+  try {
+    const { content, exists } = await githubGetFile(env, "aggregate.json");
+    if (!exists || !content) {
+      return jsonResponse({ ok: true, data: [] });
+    }
+    try {
+      const data = JSON.parse(content);
+      return jsonResponse({ ok: true, data: Array.isArray(data) ? data : [] });
+    } catch (e) {
+      return jsonResponse({ ok: false, error: "Invalid JSON format" }, 500);
+    }
+  } catch (err) {
+    return jsonResponse({ ok: false, error: String(err.message || err) }, 500);
+  }
+}
+
 // ========== باقي الدوال (Messages, Contacts, Images, Workflow) ==========
 function linesToJsonArray(text) {
   const items = text
@@ -274,7 +409,7 @@ async function handleUploadImage(request, env) {
   }
 }
 
-// ========== HTML الرئيسي (بدون مصادقة) ==========
+// ========== HTML الرئيسي (مع الجدولة والإحصائيات) ==========
 const HTML_PAGE = [
   '<!DOCTYPE html>',
   '<html lang="ar" dir="rtl">',
@@ -296,7 +431,7 @@ const HTML_PAGE = [
   '    padding: 20px;',
   '  }',
   '  .container {',
-  '    max-width: 1100px;',
+  '    max-width: 1200px;',
   '    width: 100%;',
   '    background: #141922;',
   '    border-radius: 24px;',
@@ -414,6 +549,8 @@ const HTML_PAGE = [
   '    border: 1px solid #4a5a7a;',
   '  }',
   '  .btn-outline:hover { background: #1f2838; }',
+  '  .btn-warning { background: #b8860b; }',
+  '  .btn-warning:hover { background: #d4a017; }',
   '  .status {',
   '    margin-top: 10px;',
   '    font-size: 12px;',
@@ -549,7 +686,7 @@ const HTML_PAGE = [
   '  .modal {',
   '    background: #161e2c;',
   '    border-radius: 24px;',
-  '    max-width: 800px;',
+  '    max-width: 900px;',
   '    width: 100%;',
   '    max-height: 85vh;',
   '    padding: 24px 28px;',
@@ -614,6 +751,64 @@ const HTML_PAGE = [
   '  }',
   '  .log-content .log-line .time { color: #6a8aaa; }',
   '  .log-content .log-line .emoji { margin: 0 4px; }',
+  '  .schedule-row {',
+  '    display: flex;',
+  '    gap: 12px;',
+  '    align-items: center;',
+  '    flex-wrap: wrap;',
+  '    margin-top: 8px;',
+  '  }',
+  '  .schedule-row label {',
+  '    font-size: 13px;',
+  '    color: #b0c4e8;',
+  '    display: flex;',
+  '    flex-direction: column;',
+  '    gap: 4px;',
+  '  }',
+  '  .schedule-row input[type="number"] {',
+  '    width: 70px;',
+  '    background: #0e131f;',
+  '    color: #e0e8f5;',
+  '    border: 1px solid #283040;',
+  '    border-radius: 8px;',
+  '    padding: 6px 10px;',
+  '    font-size: 14px;',
+  '  }',
+  '  .schedule-status {',
+  '    display: inline-block;',
+  '    padding: 4px 12px;',
+  '    border-radius: 20px;',
+  '    font-size: 12px;',
+  '    font-weight: 600;',
+  '  }',
+  '  .schedule-status.active { background: #2a8b5e; color: white; }',
+  '  .schedule-status.inactive { background: #5a3a3a; color: #ff9999; }',
+  '  .stats-table {',
+  '    width: 100%;',
+  '    border-collapse: collapse;',
+  '    margin-top: 10px;',
+  '    font-size: 13px;',
+  '  }',
+  '  .stats-table th {',
+  '    text-align: right;',
+  '    padding: 8px 12px;',
+  '    background: #1a2436;',
+  '    color: #b0c4e8;',
+  '  }',
+  '  .stats-table td {',
+  '    padding: 6px 12px;',
+  '    border-bottom: 1px solid #2a3445;',
+  '  }',
+  '  .stats-table .success { color: #4cdb8c; }',
+  '  .stats-table .failed { color: #ff6b6b; }',
+  '  .chart-container {',
+  '    margin-top: 16px;',
+  '    background: #0b111d;',
+  '    border-radius: 12px;',
+  '    padding: 12px;',
+  '    border: 1px solid #283040;',
+  '  }',
+  '  .chart-container canvas { width: 100% !important; height: auto !important; }',
   '</style>',
   '</head>',
   '<body>',
@@ -626,6 +821,7 @@ const HTML_PAGE = [
   '    </div>',
   '  </div>',
   '  <div class="grid">',
+  '    <!-- الرسائل -->',
   '    <div class="card">',
   '      <div class="card-header">',
   '        <span class="icon">💬</span>',
@@ -639,6 +835,7 @@ const HTML_PAGE = [
   '      </div>',
   '      <div class="status" id="messagesStatus"></div>',
   '    </div>',
+  '    <!-- جهات الاتصال -->',
   '    <div class="card">',
   '      <div class="card-header">',
   '        <span class="icon">📞</span>',
@@ -652,6 +849,7 @@ const HTML_PAGE = [
   '      </div>',
   '      <div class="status" id="contactsStatus"></div>',
   '    </div>',
+  '    <!-- الصور -->',
   '    <div class="card">',
   '      <div class="card-header">',
   '        <span class="icon">🖼️</span>',
@@ -666,19 +864,59 @@ const HTML_PAGE = [
   '      <div class="status" id="imagesStatus"></div>',
   '      <div class="file-list" id="imagesList"></div>',
   '    </div>',
+  '    <!-- الجدولة -->',
   '    <div class="card">',
   '      <div class="card-header">',
-  '        <span class="icon">📋</span>',
-  '        <h2>سجلات التشغيل</h2>',
+  '        <span class="icon">⏰</span>',
+  '        <h2>توقيت التشغيل التلقائي</h2>',
   '      </div>',
-  '      <div class="card-hint">عرض سجلات الـ workflow من مجلد <code>logs/</code></div>',
-  '      <div class="btn-row">',
-  '        <button class="btn btn-secondary" id="viewLogsBtn">📂 عرض السجلات</button>',
-  '        <button class="btn btn-outline" id="refreshLogsBtn">🔄 تحديث</button>',
+  '      <div class="card-hint">إضافة أو حذف أو تعديل توقيت الـ workflow</div>',
+  '      <div id="scheduleStatusDisplay" style="margin-bottom:8px;">',
+  '        <span class="schedule-status inactive" id="scheduleIndicator">⛔ غير مفعل</span>',
+  '        <span id="currentCronDisplay" style="font-size:12px;color:#8899bb;margin-right:10px;"></span>',
   '      </div>',
-  '      <div class="status" id="logsStatus"></div>',
+  '      <div id="scheduleControls">',
+  '        <div class="schedule-row">',
+  '          <label>الساعة (0-23)',
+  '            <input type="number" id="hourInput" min="0" max="23" value="9" />',
+  '          </label>',
+  '          <label>الدقيقة (0-59)',
+  '            <input type="number" id="minuteInput" min="0" max="59" value="0" />',
+  '          </label>',
+  '        </div>',
+  '        <div class="btn-row">',
+  '          <button class="btn btn-secondary" id="loadScheduleBtn">📥 تحميل الحالي</button>',
+  '          <button class="btn btn-success" id="addScheduleBtn">➕ إضافة / تحديث</button>',
+  '          <button class="btn btn-danger" id="removeScheduleBtn">🗑️ حذف الجدولة</button>',
+  '        </div>',
+  '        <div class="status" id="scheduleStatus"></div>',
+  '      </div>',
   '    </div>',
   '  </div>',
+  '  <!-- الإحصائيات (جدول + رسم بياني) -->',
+  '  <div class="card" style="margin-top:22px;">',
+  '    <div class="card-header">',
+  '      <span class="icon">📊</span>',
+  '      <h2>إحصائيات الإرسال (aggregate.json)</h2>',
+  '    </div>',
+  '    <div class="card-hint">عرض تقرير المحاولات والنجاح والفشل مع رسم بياني</div>',
+  '    <div class="btn-row">',
+  '      <button class="btn btn-secondary" id="loadStatsBtn">📊 تحميل وعرض الإحصائيات</button>',
+  '    </div>',
+  '    <div id="statsContainer" style="display:none; margin-top:12px;">',
+  '      <div style="max-height:250px; overflow-y:auto;">',
+  '        <table class="stats-table" id="statsTable">',
+  '          <thead><tr><th>التاريخ</th><th>محاولات</th><th>نجاح</th><th>فشل</th></tr></thead>',
+  '          <tbody id="statsBody"></tbody>',
+  '        </table>',
+  '      </div>',
+  '      <div class="chart-container">',
+  '        <canvas id="statsChart" width="600" height="250"></canvas>',
+  '      </div>',
+  '    </div>',
+  '    <div class="status" id="statsStatus"></div>',
+  '  </div>',
+  '  <!-- شريط الـ Workflow -->',
   '  <div class="workflow-bar">',
   '    <div class="left">',
   '      <span class="icon">⚡</span>',
@@ -705,8 +943,6 @@ const HTML_PAGE = [
   '  </div>',
   '</div>',
   '<script>',
-  '// ===== متغيرات عامة =====',
-  'let selectedLogFile = null;',
   '// ===== دوال المساعدة =====',
   'function setStatus(el, msg, type) {',
   '  el.textContent = msg;',
@@ -744,7 +980,7 @@ const HTML_PAGE = [
   'document.getElementById("saveMessagesBtn").onclick = () => saveFile("messages", document.getElementById("messagesArea"), document.getElementById("messagesStatus"));',
   'document.getElementById("loadContactsBtn").onclick = () => loadFile("contacts", document.getElementById("contactsArea"), document.getElementById("contactsStatus"));',
   'document.getElementById("saveContactsBtn").onclick = () => saveFile("contacts", document.getElementById("contactsArea"), document.getElementById("contactsStatus"));',
-  '// ===== الصور مع المعاينة =====',
+  '// ===== الصور =====',
   'const imagesInput = document.getElementById("imagesInput");',
   'const previewArea = document.getElementById("imagePreviewArea");',
   'let selectedFiles = [];',
@@ -896,6 +1132,228 @@ const HTML_PAGE = [
   'document.addEventListener("keydown", function(e) {',
   '  if (e.key === "Escape") { logsModal.classList.remove("active"); }',
   '});',
+  '// ===== الجدولة (Schedule) =====',
+  'const scheduleStatus = document.getElementById("scheduleStatus");',
+  'const scheduleIndicator = document.getElementById("scheduleIndicator");',
+  'const currentCronDisplay = document.getElementById("currentCronDisplay");',
+  'const hourInput = document.getElementById("hourInput");',
+  'const minuteInput = document.getElementById("minuteInput");',
+  'async function loadSchedule() {',
+  '  setStatus(scheduleStatus, "جاري التحميل...", "");',
+  '  try {',
+  '    const res = await fetch("/api/schedule");',
+  '    const data = await res.json();',
+  '    if (!data.ok) throw new Error(data.error || "خطأ");',
+  '    if (data.hasSchedule && data.cron) {',
+  '      scheduleIndicator.textContent = "✅ مفعل";',
+  '      scheduleIndicator.className = "schedule-status active";',
+  '      currentCronDisplay.textContent = "التوقيت: " + data.cron;',
+  '      const parts = data.cron.trim().split(/\\s+/);',
+  '      if (parts.length >= 2) {',
+  '        minuteInput.value = parts[0];',
+  '        hourInput.value = parts[1];',
+  '      }',
+  '      setStatus(scheduleStatus, "تم التحميل ✓", "ok");',
+  '    } else {',
+  '      scheduleIndicator.textContent = "⛔ غير مفعل";',
+  '      scheduleIndicator.className = "schedule-status inactive";',
+  '      currentCronDisplay.textContent = " (لا توجد جدولة)";',
+  '      setStatus(scheduleStatus, "الجدولة غير مفعلة حالياً", "");',
+  '    }',
+  '  } catch (err) {',
+  '    setStatus(scheduleStatus, "خطأ: " + err.message, "err");',
+  '  }',
+  '}',
+  'document.getElementById("loadScheduleBtn").onclick = loadSchedule;',
+  'document.getElementById("addScheduleBtn").onclick = async function() {',
+  '  const hour = parseInt(hourInput.value, 10);',
+  '  const minute = parseInt(minuteInput.value, 10);',
+  '  if (isNaN(hour) || hour < 0 || hour > 23 || isNaN(minute) || minute < 0 || minute > 59) {',
+  '    setStatus(scheduleStatus, "دخل ساعة (0-23) ودقيقة (0-59) صحيحة", "err");',
+  '    return;',
+  '  }',
+  '  const cron = minute + " " + hour + " * * *";',
+  '  setStatus(scheduleStatus, "جاري الحفظ...", "");',
+  '  try {',
+  '    const res = await fetch("/api/schedule", {',
+  '      method: "POST",',
+  '      headers: { "Content-Type": "application/json" },',
+  '      body: JSON.stringify({ action: "add", cron: cron })',
+  '    });',
+  '    const data = await res.json();',
+  '    if (!data.ok) throw new Error(data.error || "خطأ");',
+  '    setStatus(scheduleStatus, "تم تحديث الجدولة ✓ (" + cron + " UTC)", "ok");',
+  '    loadSchedule();',
+  '  } catch (err) {',
+  '    setStatus(scheduleStatus, "خطأ: " + err.message, "err");',
+  '  }',
+  '};',
+  'document.getElementById("removeScheduleBtn").onclick = async function() {',
+  '  if (!confirm("هل أنت متأكد من حذف الجدولة؟")) return;',
+  '  setStatus(scheduleStatus, "جاري الحذف...", "");',
+  '  try {',
+  '    const res = await fetch("/api/schedule", {',
+  '      method: "POST",',
+  '      headers: { "Content-Type": "application/json" },',
+  '      body: JSON.stringify({ action: "remove" })',
+  '    });',
+  '    const data = await res.json();',
+  '    if (!data.ok) throw new Error(data.error || "خطأ");',
+  '    setStatus(scheduleStatus, "تم حذف الجدولة ✓", "ok");',
+  '    loadSchedule();',
+  '  } catch (err) {',
+  '    setStatus(scheduleStatus, "خطأ: " + err.message, "err");',
+  '  }',
+  '};',
+  '// تحميل الجدولة عند بدء الصفحة',
+  'loadSchedule();',
+  '// ===== الإحصائيات =====',
+  'document.getElementById("loadStatsBtn").onclick = async function() {',
+  '  const statusEl = document.getElementById("statsStatus");',
+  '  setStatus(statusEl, "جاري التحميل...", "");',
+  '  try {',
+  '    const res = await fetch("/api/stats");',
+  '    const data = await res.json();',
+  '    if (!data.ok) throw new Error(data.error || "خطأ");',
+  '    if (!data.data || data.data.length === 0) {',
+  '      setStatus(statusEl, "لا توجد بيانات", "err");',
+  '      document.getElementById("statsContainer").style.display = "none";',
+  '      return;',
+  '    }',
+  '    document.getElementById("statsContainer").style.display = "block";',
+  '    setStatus(statusEl, "✓ تم التحميل", "ok");',
+  '    renderStats(data.data);',
+  '  } catch (err) {',
+  '    setStatus(statusEl, "خطأ: " + err.message, "err");',
+  '  }',
+  '};',
+  'function renderStats(data) {',
+  '  const tbody = document.getElementById("statsBody");',
+  '  tbody.innerHTML = "";',
+  '  let totalAttempted = 0, totalSuccess = 0, totalFailed = 0;',
+  '  data.forEach(row => {',
+  '    totalAttempted += row.attempted || 0;',
+  '    totalSuccess += row.success || 0;',
+  '    totalFailed += row.failed || 0;',
+  '    const tr = document.createElement("tr");',
+  '    tr.innerHTML = "<td>" + row.date + "</td>" +',
+  '                   "<td>" + (row.attempted || 0) + "</td>" +',
+  '                   "<td class=\\"success\\">" + (row.success || 0) + "</td>" +',
+  '                   "<td class=\\"failed\\">" + (row.failed || 0) + "</td>";',
+  '    tbody.appendChild(tr);',
+  '  });',
+  '  // إضافة صف المجموع',
+  '  const trTotal = document.createElement("tr");',
+  '  trTotal.style.fontWeight = "bold";',
+  '  trTotal.style.borderTop = "2px solid #4a5a7a";',
+  '  trTotal.innerHTML = "<td>المجموع</td><td>" + totalAttempted + "</td><td class=\\"success\\">" + totalSuccess + "</td><td class=\\"failed\\">" + totalFailed + "</td>";',
+  '  tbody.appendChild(trTotal);',
+  '  // رسم المبيان',
+  '  drawChart(data);',
+  '}',
+  'function drawChart(data) {',
+  '  const canvas = document.getElementById("statsChart");',
+  '  const ctx = canvas.getContext("2d");',
+  '  const width = canvas.parentElement.clientWidth || 600;',
+  '  canvas.width = width;',
+  '  canvas.height = 250;',
+  '  const height = canvas.height;',
+  '  const padding = { top: 20, bottom: 30, left: 40, right: 20 };',
+  '  const chartWidth = width - padding.left - padding.right;',
+  '  const chartHeight = height - padding.top - padding.bottom;',
+  '  // إيجاد القيمة القصوى',
+  '  let maxVal = 0;',
+  '  data.forEach(row => {',
+  '    maxVal = Math.max(maxVal, row.attempted || 0, row.success || 0, row.failed || 0);',
+  '  });',
+  '  maxVal = Math.ceil(maxVal / 5) * 5 + 5;',
+  '  ctx.clearRect(0, 0, width, height);',
+  '  // الخلفية',
+  '  ctx.fillStyle = "#0b111d";',
+  '  ctx.fillRect(0, 0, width, height);',
+  '  // المحاور',
+  '  ctx.strokeStyle = "#4a5a7a";',
+  '  ctx.lineWidth = 1;',
+  '  ctx.beginPath();',
+  '  ctx.moveTo(padding.left, padding.top);',
+  '  ctx.lineTo(padding.left, height - padding.bottom);',
+  '  ctx.lineTo(width - padding.right, height - padding.bottom);',
+  '  ctx.stroke();',
+  '  // تدريج المحور Y',
+  '  ctx.fillStyle = "#8899bb";',
+  '  ctx.font = "10px sans-serif";',
+  '  ctx.textAlign = "right";',
+  '  for (let i = 0; i <= 4; i++) {',
+  '    const val = Math.round((maxVal / 4) * i);',
+  '    const y = height - padding.bottom - (val / maxVal) * chartHeight;',
+  '    ctx.fillText(val, padding.left - 6, y + 4);',
+  '    ctx.strokeStyle = "#2a3445";',
+  '    ctx.lineWidth = 0.5;',
+  '    ctx.beginPath();',
+  '    ctx.moveTo(padding.left, y);',
+  '    ctx.lineTo(width - padding.right, y);',
+  '    ctx.stroke();',
+  '  }',
+  '  // رسم الأعمدة',
+  '  const barWidth = Math.min(30, chartWidth / (data.length * 3.5));',
+  '  const gap = (chartWidth - data.length * barWidth * 3) / (data.length + 1);',
+  '  const colors = { attempted: "#4f8cff", success: "#4cdb8c", failed: "#ff6b6b" };',
+  '  data.forEach((row, i) => {',
+  '    const x = padding.left + gap + i * (barWidth * 3 + gap);',
+  '    const attemptedH = (row.attempted / maxVal) * chartHeight;',
+  '    const successH = (row.success / maxVal) * chartHeight;',
+  '    const failedH = (row.failed / maxVal) * chartHeight;',
+  '    // عمود المحاولات',
+  '    ctx.fillStyle = colors.attempted;',
+  '    ctx.fillRect(x, height - padding.bottom - attemptedH, barWidth, attemptedH);',
+  '    // عمود النجاح',
+  '    ctx.fillStyle = colors.success;',
+  '    ctx.fillRect(x + barWidth, height - padding.bottom - successH, barWidth, successH);',
+  '    // عمود الفشل',
+  '    ctx.fillStyle = colors.failed;',
+  '    ctx.fillRect(x + barWidth * 2, height - padding.bottom - failedH, barWidth, failedH);',
+  '    // التسمية',
+  '    ctx.fillStyle = "#b0c4e8";',
+  '    ctx.font = "10px sans-serif";',
+  '    ctx.textAlign = "center";',
+  '    ctx.fillText(row.date, x + barWidth * 1.5, height - padding.bottom + 16);',
+  '  });',
+  '  // وسيلة الإيضاح',
+  '  const legendX = width - padding.right - 120;',
+  '  const legendY = padding.top + 10;',
+  '  ctx.font = "10px sans-serif";',
+  '  ctx.textAlign = "left";',
+  '  const items = [',
+  '    { label: "محاولات", color: colors.attempted },',
+  '    { label: "نجاح", color: colors.success },',
+  '    { label: "فشل", color: colors.failed }',
+  '  ];',
+  '  items.forEach((item, idx) => {',
+  '    const y = legendY + idx * 18;',
+  '    ctx.fillStyle = item.color;',
+  '    ctx.fillRect(legendX, y, 12, 12);',
+  '    ctx.fillStyle = "#c8d8f0";',
+  '    ctx.fillText(item.label, legendX + 18, y + 10);',
+  '  });',
+  '}',
+  '// عند تغيير حجم النافذة، نعيد رسم المبيان إذا كان ظاهراً',
+  'window.addEventListener("resize", function() {',
+  '  const container = document.getElementById("statsContainer");',
+  '  if (container.style.display !== "none") {',
+  '    const data = window._statsData;',
+  '    if (data) drawChart(data);',
+  '  }',
+  '});',
+  '// نخزن البيانات مؤقتاً لإعادة الرسم',
+  'const origRender = renderStats;',
+  'renderStats = function(data) {',
+  '  window._statsData = data;',
+  '  origRender(data);',
+  '};',
+  '// ===== إضافة زر عرض السجلات في القائمة =====',
+  '// (أضفناه في الـ HTML)',
+  '// ===== تهيئة أولية =====',
+  'console.log("مدير GitHub جاهز");',
   '</script>',
   '</body>',
   '</html>'
@@ -935,6 +1393,18 @@ export default {
 
     if (url.pathname === "/api/log-content" && request.method === "GET") {
       return handleGetLogContent(request, env);
+    }
+
+    if (url.pathname === "/api/schedule" && request.method === "GET") {
+      return handleLoadSchedule(request, env);
+    }
+
+    if (url.pathname === "/api/schedule" && request.method === "POST") {
+      return handleSaveSchedule(request, env);
+    }
+
+    if (url.pathname === "/api/stats" && request.method === "GET") {
+      return handleGetStats(request, env);
     }
 
     return new Response("Not found", { status: 404 });
