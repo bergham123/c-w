@@ -1,11 +1,11 @@
 /**
- * Cloudflare Worker - GitHub Manager Pro
+ * Cloudflare Worker - GitHub Manager Pro (مع إصلاح الجدولة)
  * --------------------------------------
  * - Messages: Load / Edit / Save
  * - Contacts: Load / Edit / Save
  * - Images: Preview & Upload to images/
  * - Logs: View logs from /logs/ folder
- * - Schedule: Add/Remove/Update cron schedule
+ * - Schedule: Add/Remove/Update cron schedule (تم الإصلاح)
  * - Statistics: View aggregate.json as table + chart
  * - Run Workflow: Trigger GitHub Actions
  */
@@ -174,7 +174,7 @@ async function handleGetLogContent(request, env) {
   }
 }
 
-// ========== دوال الجدولة (Schedule) ==========
+// ========== دوال الجدولة (Schedule) - النسخة المُصلَحة ==========
 function extractCron(yamlText) {
   if (!yamlText) return null;
   const match = yamlText.match(/-\s*cron:\s*'([^']*)'/);
@@ -187,19 +187,42 @@ function hasSchedule(yamlText) {
 }
 
 function setCron(yamlText, newCron) {
-  if (!yamlText) {
+  // إذا كان الملف فارغاً، ننشئ المحتوى الأساسي
+  if (!yamlText || yamlText.trim() === "") {
     return "on:\n  schedule:\n    - cron: '" + newCron + "'\n  workflow_dispatch:";
   }
-  
+
+  // نبحث عن on: في بداية السطر (قد يكون مع مسافات)
+  const lines = yamlText.split("\n");
+  let onIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*on:/.test(lines[i])) {
+      onIndex = i;
+      break;
+    }
+  }
+
+  // إذا لم نجد on:، نضيفها في البداية
+  if (onIndex === -1) {
+    return "on:\n  schedule:\n    - cron: '" + newCron + "'\n  workflow_dispatch:\n" + yamlText;
+  }
+
+  // إذا كانت الجدولة موجودة بالفعل
   if (hasSchedule(yamlText)) {
+    // نستبدل الـ cron الحالي إذا كان موجوداً
     if (/- cron:/.test(yamlText)) {
       return yamlText.replace(/-\s*cron:\s*'[^']*'/, "- cron: '" + newCron + "'");
     } else {
+      // يوجد schedule لكن لا يوجد cron (نادراً)
       return yamlText.replace(/schedule:/, "schedule:\n    - cron: '" + newCron + "'");
     }
-  } else {
-    return yamlText.replace(/^on:/, "on:\n  schedule:\n    - cron: '" + newCron + "'");
   }
+
+  // لا توجد جدولة، نضيفها بعد on: مباشرة
+  const beforeOn = lines.slice(0, onIndex + 1).join("\n");
+  const afterOn = lines.slice(onIndex + 1).join("\n");
+  // نضيف schedule: بعد on: مع مسافة بادئة
+  return beforeOn + "\n  schedule:\n    - cron: '" + newCron + "'\n" + afterOn;
 }
 
 function removeSchedule(yamlText) {
@@ -399,7 +422,7 @@ async function handleUploadImage(request, env) {
   }
 }
 
-// ========== HTML الرئيسي (مع الجدولة والإحصائيات) - جميع الأزرار مربوطة بشكل صحيح ==========
+// ========== HTML الرئيسي (مع الجدولة والإحصائيات) ==========
 const HTML_PAGE = [
   '<!DOCTYPE html>',
   '<html lang="ar" dir="rtl">',
@@ -906,7 +929,7 @@ const HTML_PAGE = [
   '    </div>',
   '    <div class="status" id="statsStatus"></div>',
   '  </div>',
-  '  <!-- شريط السجلات (أضفناه هنا) -->',
+  '  <!-- شريط السجلات -->',
   '  <div class="card" style="margin-top:22px;">',
   '    <div class="card-header">',
   '      <span class="icon">📋</span>',
@@ -1135,7 +1158,7 @@ const HTML_PAGE = [
   'document.addEventListener("keydown", function(e) {',
   '  if (e.key === "Escape") { logsModal.classList.remove("active"); }',
   '});',
-  '// ===== الجدولة (Schedule) =====',
+  '// ===== الجدولة (Schedule) - النسخة المُصلَحة =====',
   'const scheduleStatus = document.getElementById("scheduleStatus");',
   'const scheduleIndicator = document.getElementById("scheduleIndicator");',
   'const currentCronDisplay = document.getElementById("currentCronDisplay");',
@@ -1172,7 +1195,7 @@ const HTML_PAGE = [
   '  const hour = parseInt(hourInput.value, 10);',
   '  const minute = parseInt(minuteInput.value, 10);',
   '  if (isNaN(hour) || hour < 0 || hour > 23 || isNaN(minute) || minute < 0 || minute > 59) {',
-  '    setStatus(scheduleStatus, "دخل ساعة (0-23) ودقيقة (0-59) صحيحة", "err");',
+  '    setStatus(scheduleStatus, "أدخل ساعة (0-23) ودقيقة (0-59) صحيحة", "err");',
   '    return;',
   '  }',
   '  const cron = minute + " " + hour + " * * *";',
@@ -1186,7 +1209,7 @@ const HTML_PAGE = [
   '    const data = await res.json();',
   '    if (!data.ok) throw new Error(data.error || "خطأ");',
   '    setStatus(scheduleStatus, "تم تحديث الجدولة ✓ (" + cron + " UTC)", "ok");',
-  '    loadSchedule();',
+  '    loadSchedule(); // إعادة تحميل الحالة',
   '  } catch (err) {',
   '    setStatus(scheduleStatus, "خطأ: " + err.message, "err");',
   '  }',
@@ -1203,7 +1226,7 @@ const HTML_PAGE = [
   '    const data = await res.json();',
   '    if (!data.ok) throw new Error(data.error || "خطأ");',
   '    setStatus(scheduleStatus, "تم حذف الجدولة ✓", "ok");',
-  '    loadSchedule();',
+  '    loadSchedule(); // إعادة تحميل الحالة',
   '  } catch (err) {',
   '    setStatus(scheduleStatus, "خطأ: " + err.message, "err");',
   '  }',
