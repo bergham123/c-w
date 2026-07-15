@@ -2,8 +2,8 @@
  * Cloudflare Worker - GitHub JSON Editor
  * -----------------------------------------------------
  * - Serves a single HTML page (index) with:
- *    - Messages section: Load / Edit(textarea) / Save -> updates messages.json in the repo
- *    - Contacts section:  Load / Edit(textarea) / Save -> updates contacts.json in the repo
+ *    - Messages section: Load / Edit(textarea) / Save -> updates  message.json in the repo
+ *    - Contacts section:  Load / Edit(textarea) / Save -> updates accounts.json in the repo
  *    - Run Workflow button -> triggers a GitHub Actions workflow_dispatch (independent button)
  *
  * Required environment variables / secrets (set in Cloudflare dashboard or wrangler secrets):
@@ -12,8 +12,8 @@
  *    GITHUB_REPO       -> repo name, e.g. "my-repo"
  *    GITHUB_BRANCH     -> (optional) branch name, default "main"
  *    WORKFLOW_FILE     -> workflow file name inside .github/workflows/, e.g. "run.yml"
- *    MESSAGES_PATH     -> (optional) path of messages file in repo, default "messages.json"
- *    CONTACTS_PATH     -> (optional) path of contacts file in repo, default "contacts.json"
+ *    MESSAGES_PATH     -> (optional) path of messages file in repo, default " message.json"
+ *    CONTACTS_PATH     -> (optional) path of contacts file in repo, default "accounts.json"
  */
 
 function ghHeaders(env) {
@@ -26,8 +26,8 @@ function ghHeaders(env) {
 }
 
 function getPath(env, type) {
-  if (type === "messages") return env.MESSAGES_PATH || "messages.json";
-  if (type === "contacts") return env.CONTACTS_PATH || "contacts.json";
+  if (type === "messages") return env.MESSAGES_PATH || " message.json";
+  if (type === "contacts") return env.CONTACTS_PATH || "accounts.json";
   throw new Error("Unknown type: " + type);
 }
 
@@ -297,7 +297,7 @@ const HTML_PAGE = `<!DOCTYPE html>
 </head>
 <body>
   <h1>محرر ملفات JSON على GitHub</h1>
-  <div class="sub">عدّل messages.json و contacts.json مباشرة من المستودع، وشغّل الـ workflow بزر منفصل.</div>
+  <div class="sub">عدّل  message.json و accounts.json مباشرة من المستودع، وشغّل الـ workflow بزر منفصل.</div>
 
   <div class="grid">
     <div class="panel">
