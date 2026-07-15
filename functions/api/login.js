@@ -1,6 +1,5 @@
+import * as jose from 'jose';
 import { createGitHubClient } from './github.js';
-import bcrypt from 'bcryptjs';
-import { SignJWT } from 'jose';
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -23,18 +22,12 @@ export async function onRequest(context) {
     }
 
     const user = users.find(u => u.email === email);
-    if (!user) {
+    if (!user || user.password !== password) {
       return new Response(JSON.stringify({ error: 'Invalid credentials' }), { status: 401 });
     }
 
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) {
-      return new Response(JSON.stringify({ error: 'Invalid credentials' }), { status: 401 });
-    }
-
-    // Generate token using jose
     const secret = new TextEncoder().encode(env.JWT_SECRET);
-    const token = await new SignJWT({ email: user.email, username: user.username })
+    const token = await new jose.SignJWT({ email: user.email, username: user.username })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('24h')
       .sign(secret);
