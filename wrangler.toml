@@ -1,4 +1,4 @@
-name = "gh-json-editor"
+name = "wtsc"
 main = "worker.js"
 compatibility_date = "2024-11-01"
 
