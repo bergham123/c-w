@@ -1,23 +1,18 @@
 /**
- * Cloudflare Worker - GitHub JSON / Images / Schedule Editor
- * -----------------------------------------------------
- * - Serves a single HTML page with:
- *    - Messages section: Load / Edit(textarea) / Save -> updates messages file in the repo
- *    - Contacts section:  Load / Edit(textarea) / Save -> updates contacts file in the repo
- *    - Images section: pick one or more images -> uploaded to images/ folder in the repo
- *    - Schedule section: set hour/minute -> updates the cron line inside the workflow yaml file
- *    - Run Workflow button -> triggers a GitHub Actions workflow_dispatch (independent button)
- *
- * Required environment variables / secrets (set in Cloudflare dashboard or wrangler secrets):
- *    GITHUB_TOKEN      -> GitHub Personal Access Token (needs "repo" + "workflow" scopes)
- *    GITHUB_OWNER      -> GitHub username or org, e.g. "myuser"
- *    GITHUB_REPO       -> repo name, e.g. "my-repo"
- *    GITHUB_BRANCH     -> (optional) branch name, default "main"
- *    WORKFLOW_FILE     -> workflow file name inside .github/workflows/ (used for run + schedule), e.g. "send.yaml"
- *    MESSAGES_PATH     -> (optional) path of messages file in repo, default "message.json"
- *    CONTACTS_PATH     -> (optional) path of contacts file in repo, default "accounts.json"
- *    IMAGES_DIR        -> (optional) folder in repo where images are uploaded, default "images"
+ * Cloudflare Worker - GitHub Manager Pro
+ * --------------------------------------
+ * - Messages: Load / Edit / Save
+ * - Contacts: Load / Edit / Save
+ * - Images: Preview & Upload to images/
+ * - Logs: View logs from /logs/ folder
+ * - Run Workflow: Trigger GitHub Actions
+ * - Authentication: Email + Password (env vars)
  */
+
+// ========== المتغيرات البيئية المطلوبة ==========
+// GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO, GITHUB_BRANCH (اختياري)
+// WORKFLOW_FILE, MESSAGES_PATH, CONTACTS_PATH, IMAGES_DIR
+// ADMIN_EMAIL, ADMIN_PASSWORD  <-- جديد
 
 function ghHeaders(env) {
   return {
@@ -36,7 +31,6 @@ function getPath(env, type) {
 
 function getWorkflowPath(env) {
   const file = env.WORKFLOW_FILE || "send.yaml";
-  // Allow either just the filename ("send.yaml") or a full path
   return file.includes("/") ? file : `.github/workflows/${file}`;
 }
 
@@ -44,7 +38,6 @@ function getImagesDir(env) {
   return (env.IMAGES_DIR || "images").replace(/^\/+|\/+$/g, "");
 }
 
-// Base64 helpers that support UTF-8 (Arabic text etc.)
 function utf8ToBase64(str) {
   return btoa(unescape(encodeURIComponent(str)));
 }
@@ -67,7 +60,6 @@ async function githubGetFile(env, path) {
   return { content, sha: data.sha, exists: true };
 }
 
-// Like githubGetFile but returns raw base64 content untouched (for binary files / when we don't want UTF-8 decoding)
 async function githubGetFileRaw(env, path) {
   const branch = env.GITHUB_BRANCH || "main";
   const url = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURIComponent(path)}?ref=${branch}`;
@@ -102,7 +94,6 @@ async function githubPutFile(env, path, contentStr, sha, message) {
   return await res.json();
 }
 
-// Put a file where the content is ALREADY base64 (e.g. images / binary data)
 async function githubPutFileBase64(env, path, base64Content, sha, message) {
   const branch = env.GITHUB_BRANCH || "main";
   const url = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURIComponent(path)}`;
@@ -139,7 +130,68 @@ async function githubRunWorkflow(env) {
   return true;
 }
 
-// Convert raw textarea text (one item per line) into a JSON array string
+// ========== دوال السجلات (Logs) ==========
+async function githubListFiles(env, folder) {
+  const branch = env.GITHUB_BRANCH || "main";
+  const url = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURIComponent(folder)}?ref=${branch}`;
+  const res = await fetch(url, { headers: ghHeaders(env) });
+  if (res.status === 404) {
+    return { files: [], exists: false };
+  }
+  if (!res.ok) {
+    throw new Error(`GitHub list error ${res.status}: ${await res.text()}`);
+  }
+  const data = await res.json();
+  const files = data
+    .filter(item => item.type === "file" && item.name.endsWith(".log"))
+    .map(item => ({
+      name: item.name,
+      path: item.path,
+      sha: item.sha,
+      size: item.size,
+      download_url: item.download_url,
+    }));
+  return { files, exists: true };
+}
+
+async function handleGetLogs(request, env) {
+  try {
+    const { files } = await githubListFiles(env, "logs");
+    return jsonResponse({ ok: true, files });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: String(err.message || err) }, 500);
+  }
+}
+
+async function handleGetLogContent(request, env) {
+  try {
+    const url = new URL(request.url);
+    const filename = url.searchParams.get("file");
+    if (!filename) {
+      return jsonResponse({ ok: false, error: "Missing file parameter" }, 400);
+    }
+    const path = `logs/${filename}`;
+    const { content } = await githubGetFile(env, path);
+    return jsonResponse({ ok: true, content });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: String(err.message || err) }, 500);
+  }
+}
+
+// ========== دوال المصادقة ==========
+function checkAuth(request, env) {
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader || !authHeader.startsWith("Basic ")) {
+    return false;
+  }
+  const base64 = authHeader.split(" ")[1];
+  const [email, password] = atob(base64).split(":");
+  return email === env.ADMIN_EMAIL && password === env.ADMIN_PASSWORD;
+}
+
+// ========== باقي الدوال (Messages, Contacts, Images, Workflow) ==========
+// ... (نفس الكود السابق مع تعديلات طفيفة في الأسماء) ...
+
 function linesToJsonArray(text) {
   const items = text
     .split("\n")
@@ -148,7 +200,6 @@ function linesToJsonArray(text) {
   return JSON.stringify(items, null, 2);
 }
 
-// Convert stored JSON (array or anything) back into plain lines for the textarea
 function jsonToLines(jsonStr) {
   try {
     const parsed = JSON.parse(jsonStr);
@@ -159,7 +210,6 @@ function jsonToLines(jsonStr) {
     }
     return JSON.stringify(parsed, null, 2);
   } catch (e) {
-    // Not valid JSON yet (e.g. empty file) - show raw
     return jsonStr;
   }
 }
@@ -171,8 +221,7 @@ function jsonResponse(obj, status = 200) {
   });
 }
 
-// --- Messages / Contacts handlers ---
-
+// ========== معالجات API ==========
 async function handleLoad(request, env) {
   const url = new URL(request.url);
   const type = url.searchParams.get("type");
@@ -220,28 +269,6 @@ async function handleRunWorkflow(request, env) {
   }
 }
 
-// TEMPORARY diagnostic endpoint - shows exactly what the Worker sees (token hidden).
-// Remove this route once the issue is fixed, since it exposes owner/repo/paths.
-async function handleDebugEnv(request, env) {
-  const workflowFile = env.WORKFLOW_FILE || "";
-  return jsonResponse({
-    ok: true,
-    GITHUB_OWNER: env.GITHUB_OWNER || null,
-    GITHUB_REPO: env.GITHUB_REPO || null,
-    GITHUB_BRANCH: env.GITHUB_BRANCH || "main (default)",
-    WORKFLOW_FILE_raw: JSON.stringify(workflowFile), // JSON.stringify reveals hidden spaces
-    WORKFLOW_FILE_length: workflowFile.length,
-    MESSAGES_PATH: env.MESSAGES_PATH || null,
-    CONTACTS_PATH: env.CONTACTS_PATH || null,
-    IMAGES_DIR: env.IMAGES_DIR || null,
-    GITHUB_TOKEN_present: Boolean(env.GITHUB_TOKEN),
-    GITHUB_TOKEN_length: env.GITHUB_TOKEN ? env.GITHUB_TOKEN.length : 0,
-    dispatch_url_used: `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/actions/workflows/${encodeURIComponent(workflowFile)}/dispatches`,
-  });
-}
-
-// --- Image upload handler ---
-// Expects JSON: { filename: "photo.jpg", dataBase64: "<base64 without data: prefix>" }
 async function handleUploadImage(request, env) {
   try {
     const body = await request.json();
@@ -249,12 +276,10 @@ async function handleUploadImage(request, env) {
     if (!filename || !dataBase64) {
       return jsonResponse({ ok: false, error: "filename and dataBase64 are required" }, 400);
     }
-    // sanitize filename (keep it simple, avoid path traversal)
     const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
     const dir = getImagesDir(env);
     const path = `${dir}/${Date.now()}_${safeName}`;
 
-    // check if a file already exists at that exact path (unlikely due to timestamp, but just in case)
     const existing = await githubGetFileRaw(env, path);
     const result = await githubPutFileBase64(
       env,
@@ -269,443 +294,962 @@ async function handleUploadImage(request, env) {
   }
 }
 
-// --- Schedule (cron) handlers ---
-// Reads the workflow yaml, extracts the first "- cron: '...'" line value
-function extractCron(yamlText) {
-  const match = yamlText.match(/-\s*cron:\s*'([^']*)'/);
-  return match ? match[1] : null;
-}
-
-function replaceCron(yamlText, newCron) {
-  if (!/-\s*cron:\s*'[^']*'/.test(yamlText)) {
-    throw new Error("Could not find a '- cron: \\'...\\'' line in the workflow file");
-  }
-  return yamlText.replace(/-\s*cron:\s*'[^']*'/, `- cron: '${newCron}'`);
-}
-
-async function handleLoadSchedule(request, env) {
-  try {
-    const path = getWorkflowPath(env);
-    const { content } = await githubGetFile(env, path);
-    const cron = extractCron(content);
-    return jsonResponse({ ok: true, cron });
-  } catch (err) {
-    return jsonResponse({ ok: false, error: String(err.message || err) }, 500);
-  }
-}
-
-async function handleSaveSchedule(request, env) {
-  try {
-    const body = await request.json();
-    const { cron } = body;
-    if (!cron || !/^\S+\s+\S+\s+\S+\s+\S+\s+\S+$/.test(cron)) {
-      return jsonResponse({ ok: false, error: "cron must have 5 space-separated fields, e.g. '0 9 * * *'" }, 400);
-    }
-    const path = getWorkflowPath(env);
-    const current = await githubGetFile(env, path);
-    const updatedYaml = replaceCron(current.content, cron);
-    const result = await githubPutFile(
-      env,
-      path,
-      updatedYaml,
-      current.sha,
-      `Update schedule to '${cron}' via web editor`
-    );
-    return jsonResponse({ ok: true, commit: result.commit && result.commit.sha });
-  } catch (err) {
-    return jsonResponse({ ok: false, error: String(err.message || err) }, 500);
-  }
-}
-
+// ========== HTML الرئيسي (مع التعديلات) ==========
 const HTML_PAGE = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>GitHub JSON Editor</title>
+<title>مدير GitHub</title>
 <style>
-  :root {
-    --bg: #0f1115;
-    --panel: #171a21;
-    --border: #2a2e38;
-    --text: #e8eaed;
-    --muted: #9aa0ac;
-    --accent: #4f8cff;
-    --accent-hover: #3d76e0;
-    --green: #34c77b;
-    --red: #ff5c5c;
-  }
-  * { box-sizing: border-box; }
+  /* ===== إعدادات عامة ===== */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    margin: 0;
-    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    padding: 24px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #0b0e14;
+    color: #e8eaed;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
   }
-  h1 {
+  .container {
+    max-width: 1100px;
+    width: 100%;
+    background: #141922;
+    border-radius: 24px;
+    padding: 30px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+    border: 1px solid #2a303d;
+  }
+  /* ===== شريط علوي ===== */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .logo-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    font-size: 28px;
+  }
+  .logo-text {
     font-size: 20px;
-    margin-bottom: 4px;
+    font-weight: 700;
+    color: #f0f4ff;
+    letter-spacing: 0.5px;
   }
-  .sub {
-    color: var(--muted);
-    margin-bottom: 24px;
+  .logo-text span {
+    color: #6c8cff;
+  }
+  .user-area {
+    display: flex;
+    align-items: center;
+    gap: 14px;
     font-size: 13px;
+    background: #1e2533;
+    padding: 8px 16px 8px 12px;
+    border-radius: 40px;
+    border: 1px solid #2f384a;
   }
+  .user-email {
+    color: #b0c4e8;
+  }
+  .logout-btn {
+    background: none;
+    border: none;
+    color: #ff6b6b;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: 0.2s;
+  }
+  .logout-btn:hover {
+    background: #2a1a1a;
+  }
+  /* ===== شبكة البطاقات ===== */
   .grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    gap: 22px;
+    margin-top: 6px;
   }
-  @media (max-width: 800px) {
+  @media (max-width: 750px) {
     .grid { grid-template-columns: 1fr; }
   }
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 16px;
+  .card {
+    background: #1a212e;
+    border: 1px solid #2b3445;
+    border-radius: 18px;
+    padding: 20px 20px 18px;
+    transition: 0.25s;
   }
-  .panel h2 {
-    font-size: 15px;
-    margin: 0 0 4px 0;
+  .card:hover {
+    border-color: #4a5a7a;
+    box-shadow: 0 6px 20px rgba(0,20,60,0.3);
   }
-  .panel .hint {
-    color: var(--muted);
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .card-header .icon {
+    font-size: 22px;
+  }
+  .card-header h2 {
+    font-size: 17px;
+    font-weight: 600;
+    color: #eef2f9;
+  }
+  .card-hint {
+    color: #8899bb;
     font-size: 12px;
-    margin-bottom: 10px;
+    margin: 2px 0 12px 32px;
   }
   textarea {
     width: 100%;
-    min-height: 220px;
-    background: #0c0e12;
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px;
-    font-family: "Consolas", monospace;
+    min-height: 180px;
+    background: #0e131f;
+    color: #e0e8f5;
+    border: 1px solid #283040;
+    border-radius: 12px;
+    padding: 12px;
+    font-family: 'Consolas', monospace;
     font-size: 13px;
     resize: vertical;
     direction: ltr;
     text-align: left;
   }
+  textarea:focus {
+    outline: none;
+    border-color: #5a7cff;
+    box-shadow: 0 0 0 3px rgba(90,124,255,0.15);
+  }
   .btn-row {
     display: flex;
-    gap: 8px;
-    margin-top: 10px;
+    gap: 10px;
+    margin-top: 12px;
     flex-wrap: wrap;
-    align-items: center;
   }
-  button {
-    background: var(--accent);
+  .btn {
+    background: #3a4d72;
     color: white;
     border: none;
-    padding: 8px 14px;
-    border-radius: 6px;
+    padding: 8px 18px;
+    border-radius: 30px;
     cursor: pointer;
     font-size: 13px;
     font-weight: 600;
+    transition: 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
   }
-  button:hover { background: var(--accent-hover); }
-  button.secondary {
-    background: #2a2e38;
+  .btn:hover {
+    background: #4d62a0;
+    transform: scale(1.02);
   }
-  button.secondary:hover { background: #383e4c; }
-  button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  .btn-secondary {
+    background: #293241;
+  }
+  .btn-secondary:hover {
+    background: #3a455a;
+  }
+  .btn-success {
+    background: #2a8b5e;
+  }
+  .btn-success:hover {
+    background: #34a872;
+  }
+  .btn-danger {
+    background: #a03a3a;
+  }
+  .btn-danger:hover {
+    background: #c44a4a;
+  }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid #4a5a7a;
+  }
+  .btn-outline:hover {
+    background: #1f2838;
   }
   .status {
-    margin-top: 8px;
+    margin-top: 10px;
     font-size: 12px;
-    min-height: 16px;
+    min-height: 18px;
+    color: #a0b4d0;
   }
-  .status.ok { color: var(--green); }
-  .status.err { color: var(--red); }
-  .workflow-panel {
-    margin-top: 20px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 16px;
+  .status.ok { color: #4cdb8c; }
+  .status.err { color: #ff6b6b; }
+  /* ===== قسم الصور ===== */
+  .image-preview-area {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 12px 0;
+    max-height: 260px;
+    overflow-y: auto;
+    padding: 4px 2px;
+  }
+  .image-preview-item {
+    width: 90px;
+    height: 90px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid #2f384a;
+    position: relative;
+    background: #0e131f;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 10px;
+    justify-content: center;
+    transition: 0.2s;
   }
-  .workflow-panel h2 {
-    font-size: 15px;
-    margin: 0;
+  .image-preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
-  .workflow-panel .hint {
-    color: var(--muted);
+  .image-preview-item .file-name {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0,0,0,0.75);
+    color: #ddd;
+    font-size: 9px;
+    padding: 2px 4px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .image-preview-item .remove-img {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: #cc3333;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
     font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  input[type="file"] {
-    color: var(--text);
-    font-size: 12px;
-  }
-  input[type="number"] {
-    width: 70px;
-    background: #0c0e12;
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 6px 8px;
-    font-size: 13px;
-  }
-  .sched-row {
+  .file-input-wrapper {
     display: flex;
     gap: 10px;
     align-items: center;
     flex-wrap: wrap;
   }
-  .sched-row label {
+  .file-input-wrapper input[type="file"] {
+    color: #b0c4e8;
     font-size: 12px;
-    color: var(--muted);
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    background: #0e131f;
+    padding: 6px;
+    border-radius: 8px;
+    border: 1px solid #2f384a;
+    width: 100%;
+    max-width: 260px;
   }
   .file-list {
     margin-top: 8px;
     font-size: 12px;
-    color: var(--muted);
+    color: #8899bb;
     display: flex;
     flex-direction: column;
     gap: 4px;
   }
+  /* ===== زر الـ Workflow ===== */
+  .workflow-bar {
+    margin-top: 24px;
+    background: #1a212e;
+    border: 1px solid #2b3445;
+    border-radius: 18px;
+    padding: 16px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .workflow-bar .left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .workflow-bar .left .icon {
+    font-size: 24px;
+  }
+  .workflow-bar .left h3 {
+    font-size: 16px;
+    font-weight: 500;
+  }
+  .workflow-bar .left .hint {
+    font-size: 12px;
+    color: #8899bb;
+  }
+  .workflow-bar .actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  /* ===== مودال السجلات ===== */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 999;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.active {
+    display: flex;
+  }
+  .modal {
+    background: #161e2c;
+    border-radius: 24px;
+    max-width: 800px;
+    width: 100%;
+    max-height: 85vh;
+    padding: 24px 28px;
+    border: 1px solid #33405a;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.8);
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .modal-header h2 {
+    font-size: 20px;
+  }
+  .modal-close {
+    background: none;
+    border: none;
+    color: #aabbdd;
+    font-size: 28px;
+    cursor: pointer;
+  }
+  .modal-close:hover { color: white; }
+  .log-files-list {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .log-files-list .log-file-btn {
+    background: #1f2838;
+    border: 1px solid #33405a;
+    color: #c0d0e8;
+    padding: 6px 16px;
+    border-radius: 30px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: 0.2s;
+  }
+  .log-files-list .log-file-btn:hover {
+    background: #2a3650;
+  }
+  .log-files-list .log-file-btn.active {
+    background: #3a5a8a;
+    border-color: #5a7cff;
+  }
+  .log-content {
+    background: #0b111d;
+    border-radius: 14px;
+    padding: 16px;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #283040;
+    color: #c8d8f0;
+    line-height: 1.7;
+  }
+  .log-content .log-line {
+    padding: 2px 0;
+    border-bottom: 1px solid #1a2436;
+  }
+  .log-content .log-line .time {
+    color: #6a8aaa;
+  }
+  .log-content .log-line .emoji {
+    margin: 0 4px;
+  }
+  /* ===== تسجيل الدخول ===== */
+  .login-container {
+    max-width: 400px;
+    width: 100%;
+    background: #141922;
+    border-radius: 24px;
+    padding: 40px 30px;
+    border: 1px solid #2a303d;
+    text-align: center;
+  }
+  .login-container .logo {
+    font-size: 48px;
+    margin-bottom: 10px;
+  }
+  .login-container h2 {
+    margin-bottom: 24px;
+    color: #eef2f9;
+  }
+  .login-container input {
+    width: 100%;
+    padding: 12px 16px;
+    margin-bottom: 14px;
+    background: #0e131f;
+    border: 1px solid #2f384a;
+    border-radius: 12px;
+    color: white;
+    font-size: 14px;
+    direction: ltr;
+  }
+  .login-container input:focus {
+    outline: none;
+    border-color: #5a7cff;
+  }
+  .login-container .btn {
+    width: 100%;
+    justify-content: center;
+    padding: 12px;
+    font-size: 15px;
+    background: #3a5a8a;
+  }
+  .login-container .btn:hover {
+    background: #4d72a8;
+  }
+  .login-error {
+    color: #ff6b6b;
+    font-size: 13px;
+    margin-top: 10px;
+    min-height: 20px;
+  }
 </style>
 </head>
 <body>
-  <h1>محرر ملفات JSON على GitHub</h1>
-  <div class="sub">عدّل الرسائل، الأرقام، الصور، وتوقيت التشغيل مباشرة من المستودع.</div>
+<!-- ===== واجهة تسجيل الدخول ===== -->
+<div id="loginScreen" class="login-container" style="display:none;">
+  <div class="logo">🔐</div>
+  <h2>تسجيل الدخول</h2>
+  <input type="email" id="loginEmail" placeholder="البريد الإلكتروني" dir="ltr" />
+  <input type="password" id="loginPassword" placeholder="كلمة المرور" dir="ltr" />
+  <button class="btn" id="loginBtn">دخول</button>
+  <div id="loginError" class="login-error"></div>
+</div>
 
+<!-- ===== الواجهة الرئيسية ===== -->
+<div id="mainApp" class="container" style="display:none;">
+  <!-- الشريط العلوي -->
+  <div class="header">
+    <div class="logo-area">
+      <span class="logo-icon">⚙️</span>
+      <div class="logo-text">مدير <span>GitHub</span></div>
+    </div>
+    <div class="user-area">
+      <span class="user-email" id="userEmailDisplay">admin@example.com</span>
+      <button class="logout-btn" id="logoutBtn">🚪 خروج</button>
+    </div>
+  </div>
+
+  <!-- البطاقات -->
   <div class="grid">
-    <div class="panel">
-      <h2>Messages</h2>
-      <div class="hint">كل رسالة فسطر وحدو — تلقائيًا كتتحول لـ JSON array</div>
-      <textarea id="messagesArea" placeholder="اكتب رسالة فكل سطر..."></textarea>
+    <!-- بطاقة الرسائل -->
+    <div class="card">
+      <div class="card-header">
+        <span class="icon">💬</span>
+        <h2>الرسائل</h2>
+      </div>
+      <div class="card-hint">كل رسالة في سطر، تُحفظ كـ JSON array</div>
+      <textarea id="messagesArea" placeholder="اكتب رسالة في كل سطر..."></textarea>
       <div class="btn-row">
-        <button class="secondary" id="loadMessagesBtn">Load</button>
-        <button id="saveMessagesBtn">Save / Update</button>
+        <button class="btn btn-secondary" id="loadMessagesBtn">📥 تحميل</button>
+        <button class="btn btn-success" id="saveMessagesBtn">💾 حفظ</button>
       </div>
       <div class="status" id="messagesStatus"></div>
     </div>
 
-    <div class="panel">
-      <h2>Contacts</h2>
-      <div class="hint">كل رقم فسطر وحدو — تلقائيًا كيتحول لـ JSON array</div>
-      <textarea id="contactsArea" placeholder="اكتب رقم فكل سطر..."></textarea>
+    <!-- بطاقة جهات الاتصال -->
+    <div class="card">
+      <div class="card-header">
+        <span class="icon">📞</span>
+        <h2>جهات الاتصال</h2>
+      </div>
+      <div class="card-hint">كل رقم في سطر، يُحفظ كـ JSON array</div>
+      <textarea id="contactsArea" placeholder="اكتب رقم في كل سطر..."></textarea>
       <div class="btn-row">
-        <button class="secondary" id="loadContactsBtn">Load</button>
-        <button id="saveContactsBtn">Save / Update</button>
+        <button class="btn btn-secondary" id="loadContactsBtn">📥 تحميل</button>
+        <button class="btn btn-success" id="saveContactsBtn">💾 حفظ</button>
       </div>
       <div class="status" id="contactsStatus"></div>
     </div>
 
-    <div class="panel">
-      <h2>Images</h2>
-      <div class="hint">تقدر تختار وحدة ولا بزاف ديال الصور، غادي يترفعو لـ images/ فالمستودع</div>
-      <input type="file" id="imagesInput" accept="image/*" multiple />
-      <div class="btn-row">
-        <button id="uploadImagesBtn">Upload</button>
+    <!-- بطاقة الصور -->
+    <div class="card">
+      <div class="card-header">
+        <span class="icon">🖼️</span>
+        <h2>الصور</h2>
       </div>
+      <div class="card-hint">اختر صورة أو أكثر، ستُرفع إلى مجلد <code>images/</code></div>
+      <div class="file-input-wrapper">
+        <input type="file" id="imagesInput" accept="image/*" multiple />
+        <button class="btn" id="uploadImagesBtn">⬆ رفع</button>
+      </div>
+      <div class="image-preview-area" id="imagePreviewArea"></div>
       <div class="status" id="imagesStatus"></div>
       <div class="file-list" id="imagesList"></div>
     </div>
 
-    <div class="panel">
-      <h2>توقيت التشغيل التلقائي (Schedule)</h2>
-      <div class="hint">حدد الساعة والدقيقة (UTC) لي بغيتي الـ workflow يتشغل فيها كل يوم</div>
-      <div class="sched-row">
-        <label>الساعة (0-23)
-          <input type="number" id="hourInput" min="0" max="23" value="9" />
-        </label>
-        <label>الدقيقة (0-59)
-          <input type="number" id="minuteInput" min="0" max="59" value="0" />
-        </label>
+    <!-- بطاقة السجلات -->
+    <div class="card">
+      <div class="card-header">
+        <span class="icon">📋</span>
+        <h2>سجلات التشغيل</h2>
       </div>
+      <div class="card-hint">عرض سجلات الـ workflow من مجلد <code>logs/</code></div>
       <div class="btn-row">
-        <button class="secondary" id="loadScheduleBtn">Load Current</button>
-        <button id="saveScheduleBtn">Save Schedule</button>
+        <button class="btn btn-secondary" id="viewLogsBtn">📂 عرض السجلات</button>
+        <button class="btn btn-outline" id="refreshLogsBtn">🔄 تحديث</button>
       </div>
-      <div class="status" id="scheduleStatus"></div>
+      <div class="status" id="logsStatus"></div>
     </div>
   </div>
 
-  <div class="workflow-panel">
-    <div>
-      <h2>GitHub Actions Workflow</h2>
-      <div class="hint">هاد الزر خدامتو وحدو، مايتوقفش على شي حاجة أخرى</div>
+  <!-- شريط الـ Workflow -->
+  <div class="workflow-bar">
+    <div class="left">
+      <span class="icon">⚡</span>
+      <div>
+        <h3>GitHub Actions</h3>
+        <div class="hint">تشغيل الـ workflow يدوياً</div>
+      </div>
     </div>
-    <div>
-      <button id="runWorkflowBtn">▶ Run Workflow</button>
-      <div class="status" id="workflowStatus"></div>
+    <div class="actions">
+      <button class="btn" id="runWorkflowBtn">▶ تشغيل</button>
+      <div class="status" id="workflowStatus" style="margin:0;"></div>
     </div>
   </div>
+</div>
+
+<!-- ===== مودال السجلات ===== -->
+<div class="modal-overlay" id="logsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>📋 سجلات التشغيل</h2>
+      <button class="modal-close" id="closeLogsModal">✕</button>
+    </div>
+    <div class="log-files-list" id="logFilesList"></div>
+    <div class="log-content" id="logContent">اختر ملف سجل من الأعلى لعرض محتواه...</div>
+  </div>
+</div>
 
 <script>
-  function setStatus(el, msg, type) {
-    el.textContent = msg;
-    el.className = "status" + (type ? " " + type : "");
-  }
+// ===== متغيرات عامة =====
+let selectedLogFile = null;
 
-  async function loadFile(type, areaEl, statusEl) {
-    setStatus(statusEl, "كيتحمل...", "");
+// ===== دوال المساعدة =====
+function setStatus(el, msg, type) {
+  el.textContent = msg;
+  el.className = "status" + (type ? " " + type : "");
+}
+
+// ===== المصادقة =====
+function checkAuth() {
+  const auth = sessionStorage.getItem('auth');
+  if (auth) {
     try {
-      const res = await fetch("/api/load?type=" + type);
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "خطأ غير معروف");
-      areaEl.value = data.text;
-      setStatus(statusEl, "تم التحميل ✔", "ok");
-    } catch (err) {
-      setStatus(statusEl, "خطأ: " + err.message, "err");
-    }
+      const data = JSON.parse(auth);
+      if (data.email && data.password) {
+        return data;
+      }
+    } catch(e) {}
   }
+  return null;
+}
 
-  async function saveFile(type, areaEl, statusEl) {
-    setStatus(statusEl, "كيتسجل...", "");
-    try {
-      const res = await fetch("/api/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, text: areaEl.value }),
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "خطأ غير معروف");
-      setStatus(statusEl, "تم الحفظ ✔ (commit تم)", "ok");
-    } catch (err) {
-      setStatus(statusEl, "خطأ: " + err.message, "err");
-    }
+function doLogin(email, password) {
+  sessionStorage.setItem('auth', JSON.stringify({ email, password }));
+  showApp();
+}
+
+function doLogout() {
+  sessionStorage.removeItem('auth');
+  showLogin();
+}
+
+function showLogin() {
+  document.getElementById('loginScreen').style.display = 'block';
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('loginError').textContent = '';
+}
+
+function showApp() {
+  const auth = checkAuth();
+  if (!auth) {
+    showLogin();
+    return;
   }
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('userEmailDisplay').textContent = auth.email;
+}
 
-  const messagesArea = document.getElementById("messagesArea");
-  const messagesStatus = document.getElementById("messagesStatus");
-  document.getElementById("loadMessagesBtn").onclick = () => loadFile("messages", messagesArea, messagesStatus);
-  document.getElementById("saveMessagesBtn").onclick = () => saveFile("messages", messagesArea, messagesStatus);
-
-  const contactsArea = document.getElementById("contactsArea");
-  const contactsStatus = document.getElementById("contactsStatus");
-  document.getElementById("loadContactsBtn").onclick = () => loadFile("contacts", contactsArea, contactsStatus);
-  document.getElementById("saveContactsBtn").onclick = () => saveFile("contacts", contactsArea, contactsStatus);
-
-  const workflowStatus = document.getElementById("workflowStatus");
-  document.getElementById("runWorkflowBtn").onclick = async () => {
-    setStatus(workflowStatus, "كيتشغل...", "");
-    try {
-      const res = await fetch("/api/run-workflow", { method: "POST" });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "خطأ غير معروف");
-      setStatus(workflowStatus, "تم تشغيل الـ workflow ✔", "ok");
-    } catch (err) {
-      setStatus(workflowStatus, "خطأ: " + err.message, "err");
+// ===== أحداث تسجيل الدخول =====
+document.getElementById('loginBtn').onclick = function() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value.trim();
+  if (!email || !password) {
+    document.getElementById('loginError').textContent = 'الرجاء إدخال البريد وكلمة المرور';
+    return;
+  }
+  // إرسال طلب مصادقة إلى الخادم
+  fetch('/api/auth', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      doLogin(email, password);
+    } else {
+      document.getElementById('loginError').textContent = data.error || 'بيانات غير صحيحة';
     }
+  })
+  .catch(() => {
+    document.getElementById('loginError').textContent = 'خطأ في الاتصال';
+  });
+};
+
+// السماح بالدخول بالضغط على Enter
+document.getElementById('loginPassword').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('loginBtn').click();
+});
+document.getElementById('loginEmail').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('loginBtn').click();
+});
+
+document.getElementById('logoutBtn').onclick = doLogout;
+
+// ===== التحقق من المصادقة عند التحميل =====
+const auth = checkAuth();
+if (auth) {
+  showApp();
+} else {
+  showLogin();
+}
+
+// ===== دوال API مع المصادقة =====
+function getHeaders() {
+  const auth = checkAuth();
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': 'Basic ' + btoa(auth.email + ':' + auth.password)
   };
+}
 
-  // --- Images ---
-  function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result; // data:<mime>;base64,XXXX
-        const base64 = result.split(",")[1];
-        resolve(base64);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+async function apiCall(url, options = {}) {
+  const headers = getHeaders();
+  const res = await fetch(url, {
+    ...options,
+    headers: { ...headers, ...(options.headers || {}) }
+  });
+  if (res.status === 401) {
+    doLogout();
+    throw new Error('انتهت الجلسة، الرجاء تسجيل الدخول مجدداً');
+  }
+  return res;
+}
+
+// ===== الرسائل وجهات الاتصال =====
+async function loadFile(type, areaEl, statusEl) {
+  setStatus(statusEl, 'جاري التحميل...', '');
+  try {
+    const res = await apiCall('/api/load?type=' + type);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'خطأ غير معروف');
+    areaEl.value = data.text;
+    setStatus(statusEl, 'تم التحميل ✓', 'ok');
+  } catch (err) {
+    setStatus(statusEl, 'خطأ: ' + err.message, 'err');
+  }
+}
+
+async function saveFile(type, areaEl, statusEl) {
+  setStatus(statusEl, 'جاري الحفظ...', '');
+  try {
+    const res = await apiCall('/api/save', {
+      method: 'POST',
+      body: JSON.stringify({ type, text: areaEl.value })
     });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'خطأ غير معروف');
+    setStatus(statusEl, 'تم الحفظ ✓ (commit)', 'ok');
+  } catch (err) {
+    setStatus(statusEl, 'خطأ: ' + err.message, 'err');
   }
+}
 
-  const imagesInput = document.getElementById("imagesInput");
-  const imagesStatus = document.getElementById("imagesStatus");
-  const imagesList = document.getElementById("imagesList");
-  document.getElementById("uploadImagesBtn").onclick = async () => {
-    const files = imagesInput.files;
-    if (!files || files.length === 0) {
-      setStatus(imagesStatus, "اختار شي صورة أولاً", "err");
-      return;
-    }
-    imagesList.innerHTML = "";
-    setStatus(imagesStatus, "كيترفع " + files.length + " ديال الصور...", "");
-    let successCount = 0;
-    for (const file of files) {
-      const line = document.createElement("div");
-      line.textContent = file.name + " ...";
-      imagesList.appendChild(line);
-      try {
-        const base64 = await fileToBase64(file);
-        const res = await fetch("/api/upload-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filename: file.name, dataBase64: base64 }),
-        });
-        const data = await res.json();
-        if (!data.ok) throw new Error(data.error || "خطأ غير معروف");
-        line.textContent = "✔ " + file.name + " -> " + data.path;
-        successCount++;
-      } catch (err) {
-        line.textContent = "✘ " + file.name + " : " + err.message;
-      }
-    }
-    setStatus(imagesStatus, successCount + "/" + files.length + " صورة تم رفعها", successCount === files.length ? "ok" : "err");
-  };
+document.getElementById('loadMessagesBtn').onclick = () =>
+  loadFile('messages', document.getElementById('messagesArea'), document.getElementById('messagesStatus'));
+document.getElementById('saveMessagesBtn').onclick = () =>
+  saveFile('messages', document.getElementById('messagesArea'), document.getElementById('messagesStatus'));
 
-  // --- Schedule ---
-  const hourInput = document.getElementById("hourInput");
-  const minuteInput = document.getElementById("minuteInput");
-  const scheduleStatus = document.getElementById("scheduleStatus");
+document.getElementById('loadContactsBtn').onclick = () =>
+  loadFile('contacts', document.getElementById('contactsArea'), document.getElementById('contactsStatus'));
+document.getElementById('saveContactsBtn').onclick = () =>
+  saveFile('contacts', document.getElementById('contactsArea'), document.getElementById('contactsStatus'));
 
-  document.getElementById("loadScheduleBtn").onclick = async () => {
-    setStatus(scheduleStatus, "كيتحمل...", "");
+// ===== الصور مع المعاينة =====
+const imagesInput = document.getElementById('imagesInput');
+const previewArea = document.getElementById('imagePreviewArea');
+let selectedFiles = [];
+
+imagesInput.addEventListener('change', function(e) {
+  selectedFiles = Array.from(this.files);
+  renderPreviews();
+});
+
+function renderPreviews() {
+  previewArea.innerHTML = '';
+  selectedFiles.forEach((file, index) => {
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      const div = document.createElement('div');
+      div.className = 'image-preview-item';
+      div.innerHTML = \`
+        <img src="\${ev.target.result}" alt="\${file.name}" />
+        <span class="file-name">\${file.name}</span>
+        <button class="remove-img" data-index="\${index}">✕</button>
+      \`;
+      previewArea.appendChild(div);
+      div.querySelector('.remove-img').onclick = function() {
+        selectedFiles.splice(index, 1);
+        renderPreviews();
+        // تحديث input
+        const dt = new DataTransfer();
+        selectedFiles.forEach(f => dt.items.add(f));
+        imagesInput.files = dt.files;
+      };
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+document.getElementById('uploadImagesBtn').onclick = async function() {
+  const files = selectedFiles;
+  if (!files || files.length === 0) {
+    setStatus(document.getElementById('imagesStatus'), 'اختر صورة أولاً', 'err');
+    return;
+  }
+  const listEl = document.getElementById('imagesList');
+  listEl.innerHTML = '';
+  setStatus(document.getElementById('imagesStatus'), 'جاري رفع ' + files.length + ' صورة...', '');
+  let success = 0;
+  for (const file of files) {
+    const line = document.createElement('div');
+    line.textContent = file.name + ' ...';
+    listEl.appendChild(line);
     try {
-      const res = await fetch("/api/schedule");
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "خطأ غير معروف");
-      if (data.cron) {
-        const parts = data.cron.trim().split(/\s+/);
-        minuteInput.value = parts[0];
-        hourInput.value = parts[1];
-        setStatus(scheduleStatus, "الوقت الحالي: " + data.cron, "ok");
-      } else {
-        setStatus(scheduleStatus, "ماكاينش cron حاليًا فالملف", "err");
-      }
-    } catch (err) {
-      setStatus(scheduleStatus, "خطأ: " + err.message, "err");
-    }
-  };
-
-  document.getElementById("saveScheduleBtn").onclick = async () => {
-    const hour = parseInt(hourInput.value, 10);
-    const minute = parseInt(minuteInput.value, 10);
-    if (isNaN(hour) || hour < 0 || hour > 23 || isNaN(minute) || minute < 0 || minute > 59) {
-      setStatus(scheduleStatus, "دخل ساعة (0-23) ودقيقة (0-59) صحاح", "err");
-      return;
-    }
-    const cron = minute + " " + hour + " * * *";
-    setStatus(scheduleStatus, "كيتسجل...", "");
-    try {
-      const res = await fetch("/api/schedule", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cron }),
+      const base64 = await fileToBase64(file);
+      const res = await apiCall('/api/upload-image', {
+        method: 'POST',
+        body: JSON.stringify({ filename: file.name, dataBase64: base64 })
       });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "خطأ غير معروف");
-      setStatus(scheduleStatus, "تم تحديث التوقيت ✔ (" + cron + " UTC)", "ok");
+      if (!data.ok) throw new Error(data.error || 'خطأ');
+      line.textContent = '✓ ' + file.name + ' -> ' + data.path;
+      success++;
     } catch (err) {
-      setStatus(scheduleStatus, "خطأ: " + err.message, "err");
+      line.textContent = '✘ ' + file.name + ' : ' + err.message;
     }
-  };
+  }
+  setStatus(document.getElementById('imagesStatus'), success + '/' + files.length + ' صورة تم رفعها', success === files.length ? 'ok' : 'err');
+  if (success === files.length) {
+    selectedFiles = [];
+    imagesInput.value = '';
+    renderPreviews();
+  }
+};
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ===== تشغيل الـ Workflow =====
+document.getElementById('runWorkflowBtn').onclick = async function() {
+  const statusEl = document.getElementById('workflowStatus');
+  setStatus(statusEl, 'جاري التشغيل...', '');
+  try {
+    const res = await apiCall('/api/run-workflow', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'خطأ غير معروف');
+    setStatus(statusEl, 'تم التشغيل ✓', 'ok');
+  } catch (err) {
+    setStatus(statusEl, 'خطأ: ' + err.message, 'err');
+  }
+};
+
+// ===== السجلات =====
+const logsModal = document.getElementById('logsModal');
+const logFilesList = document.getElementById('logFilesList');
+const logContent = document.getElementById('logContent');
+
+document.getElementById('viewLogsBtn').onclick = function() {
+  logsModal.classList.add('active');
+  loadLogFiles();
+};
+
+document.getElementById('closeLogsModal').onclick = function() {
+  logsModal.classList.remove('active');
+};
+
+document.getElementById('refreshLogsBtn').onclick = function() {
+  loadLogFiles();
+};
+
+// إغلاق المودال بالضغط خارجها
+logsModal.addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('active');
+});
+
+async function loadLogFiles() {
+  setStatus(document.getElementById('logsStatus'), 'جاري تحميل السجلات...', '');
+  try {
+    const res = await apiCall('/api/logs');
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'خطأ');
+    logFilesList.innerHTML = '';
+    data.files.forEach(file => {
+      const btn = document.createElement('button');
+      btn.className = 'log-file-btn';
+      btn.textContent = file.name;
+      btn.onclick = () => loadLogContent(file.name);
+      logFilesList.appendChild(btn);
+    });
+    if (data.files.length === 0) {
+      logFilesList.innerHTML = '<span style="color:#8899bb;">لا توجد سجلات</span>';
+      logContent.textContent = 'لا توجد ملفات سجل.';
+    }
+    setStatus(document.getElementById('logsStatus'), '✓ تم التحميل', 'ok');
+  } catch (err) {
+    setStatus(document.getElementById('logsStatus'), 'خطأ: ' + err.message, 'err');
+  }
+}
+
+async function loadLogContent(filename) {
+  logContent.textContent = 'جاري التحميل...';
+  try {
+    const res = await apiCall('/api/log-content?file=' + encodeURIComponent(filename));
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'خطأ');
+    // تنسيق السجل
+    const lines = data.content.split('\n').filter(l => l.trim());
+    let html = '';
+    lines.forEach(line => {
+      // تلوين حسب الإيموجي
+      let color = '#c8d8f0';
+      if (line.includes('🚀')) color = '#6ac8ff';
+      else if (line.includes('✅')) color = '#4cdb8c';
+      else if (line.includes('⏳')) color = '#f0c060';
+      else if (line.includes('❌') || line.includes('خطأ')) color = '#ff6b6b';
+      else if (line.includes('📌')) color = '#b090d0';
+      html += `<div class="log-line" style="color:${color}">${line}</div>`;
+    });
+    logContent.innerHTML = html || 'المحتوى فارغ';
+  } catch (err) {
+    logContent.textContent = 'خطأ: ' + err.message;
+  }
+}
+
+// ===== إغلاق المودال بالـ Escape =====
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    logsModal.classList.remove('active');
+  }
+});
 </script>
 </body>
 </html>`;
 
+// ========== معالج الـ Worker الرئيسي ==========
 export default {
   async fetch(request, env) {
+    // التحقق من المصادقة لجميع الطلبات (ما عدا صفحة تسجيل الدخول نفسها)
     const url = new URL(request.url);
+    
+    // السماح بطلبات المصادقة
+    if (url.pathname === "/api/auth" && request.method === "POST") {
+      try {
+        const { email, password } = await request.json();
+        if (email === env.ADMIN_EMAIL && password === env.ADMIN_PASSWORD) {
+          return jsonResponse({ ok: true });
+        }
+        return jsonResponse({ ok: false, error: "بيانات غير صحيحة" }, 401);
+      } catch {
+        return jsonResponse({ ok: false, error: "طلب غير صحيح" }, 400);
+      }
+    }
 
+    // التحقق من المصادقة للصفحة الرئيسية والـ API
+    const authHeader = request.headers.get("Authorization");
+    let isAuthenticated = false;
+    if (authHeader && authHeader.startsWith("Basic ")) {
+      try {
+        const base64 = authHeader.split(" ")[1];
+        const [email, password] = atob(base64).split(":");
+        if (email === env.ADMIN_EMAIL && password === env.ADMIN_PASSWORD) {
+          isAuthenticated = true;
+        }
+      } catch(e) {}
+    }
+
+    // إذا لم يكن مصادقاً وأراد الوصول إلى أي مسار غير /api/auth
+    if (!isAuthenticated && url.pathname !== "/api/auth") {
+      // نعيد صفحة تسجيل الدخول من الـ HTML ولكن مع إظهار شاشة الدخول
+      // نضيف script لتعطيل الـ main وإظهار login
+      const loginHTML = HTML_PAGE.replace(
+        'document.getElementById("loginScreen").style.display = "none";',
+        'document.getElementById("loginScreen").style.display = "block";'
+      ).replace(
+        'document.getElementById("mainApp").style.display = "none";',
+        'document.getElementById("mainApp").style.display = "none";'
+      );
+      return new Response(loginHTML, {
+        status: 401,
+        headers: { "Content-Type": "text/html; charset=utf-8" }
+      });
+    }
+
+    // ===== المسارات المحمية =====
     if (url.pathname === "/" && request.method === "GET") {
       return new Response(HTML_PAGE, {
         headers: { "Content-Type": "text/html; charset=utf-8" },
@@ -728,12 +1272,12 @@ export default {
       return handleUploadImage(request, env);
     }
 
-    if (url.pathname === "/api/schedule" && request.method === "GET") {
-      return handleLoadSchedule(request, env);
+    if (url.pathname === "/api/logs" && request.method === "GET") {
+      return handleGetLogs(request, env);
     }
 
-    if (url.pathname === "/api/schedule" && request.method === "POST") {
-      return handleSaveSchedule(request, env);
+    if (url.pathname === "/api/log-content" && request.method === "GET") {
+      return handleGetLogContent(request, env);
     }
 
     return new Response("Not found", { status: 404 });
