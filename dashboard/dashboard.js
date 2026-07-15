@@ -1,389 +1,146 @@
-// ===============================
-// Elements
-// ===============================
+// dashboard.js - نسخة مبسطة بلا توكن
+document.addEventListener('DOMContentLoaded', () => {
+    // نحيدو التحقق من التوكن
+    // نعرضو الحالة
+    document.getElementById('status').textContent = 'System Ready ✅';
 
-const accountsArea = document.getElementById("accounts");
-const messagesArea = document.getElementById("messages");
-
-const loadAccountsBtn = document.getElementById("loadAccounts");
-const loadMessagesBtn = document.getElementById("loadMessages");
-
-const clearAccountsBtn = document.getElementById("clearAccounts");
-const clearMessagesBtn = document.getElementById("clearMessages");
-
-const saveAllBtn = document.getElementById("saveAll");
-const runWorkflowBtn = document.getElementById("runWorkflow");
-
-const logs = document.getElementById("logs");
-const status = document.getElementById("status");
-
-// ===============================
-// Auth Helpers
-// ===============================
-
-function getToken() {
-    return localStorage.getItem("token");
-}
-
-function getAuthHeaders() {
-    const token = getToken();
-    return {
-        "Content-Type": "application/json",
-        "Authorization": token ? `Bearer ${token}` : ""
-    };
-}
-
-async function fetchWithAuth(url, options = {}) {
-    const headers = {
-        ...getAuthHeaders(),
-        ...(options.headers || {})
-    };
-    return fetch(url, {
-        ...options,
-        headers
+    // Load buttons
+    document.getElementById('loadAccounts').addEventListener('click', loadAccounts);
+    document.getElementById('clearAccounts').addEventListener('click', () => document.getElementById('accounts').value = '');
+    document.getElementById('loadMessages').addEventListener('click', loadMessages);
+    document.getElementById('clearMessages').addEventListener('click', () => document.getElementById('messages').value = '');
+    document.getElementById('saveAll').addEventListener('click', saveAll);
+    document.getElementById('runWorkflow').addEventListener('click', runWorkflow);
+    document.getElementById('uploadImageBtn').addEventListener('click', uploadImage);
+    document.getElementById('setScheduleBtn').addEventListener('click', setSchedule);
+    document.getElementById('loadScheduleBtn').addEventListener('click', loadSchedule);
+    document.getElementById('logout').addEventListener('click', () => {
+        // مجرد توجيه للصفحة الرئيسية (أو نحيدو الزر)
+        window.location.href = 'index.html';
     });
-}
 
-// ===============================
-// Helpers
-// ===============================
+    // تحميل البيانات عند بدء التشغيل
+    loadAccounts();
+    loadMessages();
+    loadSchedule();
+});
 
-function log(text) {
-    const time = new Date().toLocaleTimeString();
-    logs.innerHTML += `<div>[${time}] ${text}</div>`;
-    logs.scrollTop = logs.scrollHeight;
-}
-
-function setStatus(text, type = "info") {
-    status.textContent = text;
-    // Change color based on type
-    status.style.color = type === "error" ? "#ef4444" :
-                         type === "success" ? "#22c55e" :
-                         type === "warning" ? "#f59e0b" :
-                         type === "running" ? "#3b82f6" :
-                         "#94a3b8";
-}
-
-// ===============================
-// Convert Text => JSON Array
-// ===============================
-
-function textToArray(text) {
-    return [...new Set(
-        text
-            .split("\n")
-            .map(x => x.trim())
-            .filter(x => x !== "")
-    )];
-}
-
-// ===============================
-// Clear
-// ===============================
-
-clearAccountsBtn.onclick = () => {
-    accountsArea.value = "";
-    log("Accounts cleared");
-};
-
-clearMessagesBtn.onclick = () => {
-    messagesArea.value = "";
-    log("Messages cleared");
-};
-
-// ===============================
-// Load Accounts
-// ===============================
-
-loadAccountsBtn.onclick = async () => {
-    try {
-        setStatus("Loading Accounts...", "warning");
-        const res = await fetchWithAuth("/api/load-accounts");
-        
-        if (res.status === 401) {
-            localStorage.removeItem("token");
-            location.href = "login.html";
-            return;
-        }
-
-        const data = await res.json();
-        accountsArea.value = data.join("\n");
-        log("Accounts loaded");
-        setStatus("Ready", "success");
-    } catch (e) {
-        log("Cannot load accounts");
-        setStatus("Error loading accounts", "error");
-        console.error(e);
+async function fetchAPI(endpoint, options = {}) {
+    const res = await fetch(`/api/${endpoint}`, {
+        ...options,
+        headers: { 'Content-Type': 'application/json' }
+    });
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`API error: ${text}`);
     }
-};
+    return res.json();
+}
 
-// ===============================
-// Load Messages
-// ===============================
-
-loadMessagesBtn.onclick = async () => {
+async function loadAccounts() {
     try {
-        setStatus("Loading Messages...", "warning");
-        const res = await fetchWithAuth("/api/load-messages");
-        
-        if (res.status === 401) {
-            localStorage.removeItem("token");
-            location.href = "login.html";
-            return;
-        }
-
-        const data = await res.json();
-        messagesArea.value = data.join("\n");
-        log("Messages loaded");
-        setStatus("Ready", "success");
-    } catch (e) {
-        log("Cannot load messages");
-        setStatus("Error loading messages", "error");
-        console.error(e);
+        const data = await fetchAPI('load-accounts');
+        document.getElementById('accounts').value = data.join('\n');
+        addLog('Accounts loaded ✅');
+    } catch (err) {
+        addLog('Error loading accounts: ' + err.message);
     }
-};
+}
 
-// ===============================
-// Save All
-// ===============================
+async function loadMessages() {
+    try {
+        const data = await fetchAPI('load-messages');
+        document.getElementById('messages').value = data.join('\n');
+        addLog('Messages loaded ✅');
+    } catch (err) {
+        addLog('Error loading messages: ' + err.message);
+    }
+}
 
-saveAllBtn.onclick = async () => {
-    const accounts = textToArray(accountsArea.value);
-    const messages = textToArray(messagesArea.value);
+async function loadSchedule() {
+    try {
+        const data = await fetchAPI('load-schedule');
+        document.getElementById('scheduleTime').value = data.time || '';
+        document.getElementById('scheduleStatus').textContent = data.time ? `Current schedule: ${data.time}` : 'No schedule set';
+    } catch (err) {
+        addLog('Error loading schedule: ' + err.message);
+    }
+}
 
-    if (accounts.length === 0) {
-        alert("Accounts Empty");
+async function saveAll() {
+    const accounts = document.getElementById('accounts').value.split('\n').filter(s => s.trim() !== '');
+    const messages = document.getElementById('messages').value.split('\n').filter(s => s.trim() !== '');
+    if (!accounts.length || !messages.length) {
+        addLog('⚠️ Please enter at least one account and one message.');
         return;
     }
-
-    if (messages.length === 0) {
-        alert("Messages Empty");
-        return;
-    }
-
-    saveAllBtn.disabled = true;
-    setStatus("Saving...", "warning");
-    log("Uploading data...");
-
     try {
-        const res = await fetchWithAuth("/api/save-all", {
-            method: "POST",
+        await fetchAPI('save-all', {
+            method: 'POST',
             body: JSON.stringify({ accounts, messages })
         });
-
-        if (res.status === 401) {
-            localStorage.removeItem("token");
-            location.href = "login.html";
-            return;
-        }
-
-        const data = await res.json();
-
-        if (data.success) {
-            log("Accounts saved");
-            log("Messages saved");
-            log("GitHub Commit Created");
-            setStatus("Saved Successfully", "success");
-            runWorkflowBtn.disabled = false;
-        } else {
-            log(data.error || "Save failed");
-            setStatus("Save failed", "error");
-            alert(data.error || "Save failed");
-        }
+        addLog('✅ All saved successfully!');
+        document.getElementById('runWorkflow').disabled = false;
     } catch (err) {
-        console.error(err);
-        log("Server Error");
-        setStatus("Server Error", "error");
-    }
-
-    saveAllBtn.disabled = false;
-};
-
-// ===============================
-// Run Workflow
-// ===============================
-
-runWorkflowBtn.onclick = async () => {
-    runWorkflowBtn.disabled = true;
-    setStatus("Starting Workflow...", "running");
-    log("Sending request...");
-
-    try {
-        const res = await fetchWithAuth("/api/run-workflow", {
-            method: "POST"
-        });
-
-        if (res.status === 401) {
-            localStorage.removeItem("token");
-            location.href = "login.html";
-            return;
-        }
-
-        const data = await res.json();
-
-        if (data.success) {
-            log("Workflow Started");
-            setStatus("Workflow Running", "running");
-        } else {
-            log(data.error || "Workflow failed");
-            setStatus("Workflow failed", "error");
-        }
-    } catch (e) {
-        console.error(e);
-        log("Workflow Error");
-        setStatus("Workflow Error", "error");
-    } finally {
-        runWorkflowBtn.disabled = false;
-    }
-};
-
-// ===============================
-// Logout
-// ===============================
-
-document.getElementById("logout").onclick = () => {
-    localStorage.removeItem("token");
-    location.href = "login.html";
-};
-
-// ===============================
-// Check Login & Auth
-// ===============================
-
-async function checkAuth() {
-    const token = getToken();
-    if (!token) {
-        location.href = "login.html";
-        return false;
-    }
-
-    try {
-        const res = await fetchWithAuth("/api/auth");
-        if (res.status === 401) {
-            localStorage.removeItem("token");
-            location.href = "login.html";
-            return false;
-        }
-        const data = await res.json();
-        if (!data.valid) {
-            localStorage.removeItem("token");
-            location.href = "login.html";
-            return false;
-        }
-        return true;
-    } catch (e) {
-        console.error("Auth check failed:", e);
-        location.href = "login.html";
-        return false;
+        addLog('❌ Error saving: ' + err.message);
     }
 }
 
-// ===============================
-// Upload Image
-// ===============================
+async function runWorkflow() {
+    try {
+        await fetchAPI('run-workflow', { method: 'POST' });
+        addLog('🚀 Workflow triggered!');
+    } catch (err) {
+        addLog('❌ Workflow error: ' + err.message);
+    }
+}
 
-const imageInput = document.getElementById('imageInput');
-const uploadImageBtn = document.getElementById('uploadImageBtn');
-const uploadResult = document.getElementById('uploadResult');
-
-if (uploadImageBtn) {
-    uploadImageBtn.onclick = async () => {
-        const file = imageInput.files[0];
-        if (!file) {
-            alert('Please select an image');
-            return;
-        }
-
+async function uploadImage() {
+    const input = document.getElementById('imageInput');
+    const file = input.files[0];
+    if (!file) {
+        addLog('⚠️ Please select an image.');
+        return;
+    }
+    try {
         const reader = new FileReader();
-        reader.onload = async (e) => {
-            const base64 = e.target.result.split(',')[1];
-            const filename = file.name;
-
-            try {
-                const res = await fetchWithAuth('/api/upload-image', {
-                    method: 'POST',
-                    body: JSON.stringify({ filename, base64 })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    uploadResult.innerHTML = `✅ Image uploaded! <a href="${data.url}" target="_blank">${data.url}</a>`;
-                    log(`Image uploaded: ${filename}`);
-                } else {
-                    uploadResult.textContent = '❌ ' + (data.error || 'Upload failed');
-                }
-            } catch (err) {
-                uploadResult.textContent = '❌ Error uploading';
-                console.error(err);
-            }
+        reader.onload = async () => {
+            const base64 = reader.result.split(',')[1];
+            const result = await fetchAPI('upload-image', {
+                method: 'POST',
+                body: JSON.stringify({ filename: file.name, base64 })
+            });
+            document.getElementById('uploadResult').textContent = `✅ Image uploaded: ${result.url}`;
+            addLog('🖼️ Image uploaded: ' + result.url);
         };
         reader.readAsDataURL(file);
-    };
-}
-
-// ===============================
-// Schedule
-// ===============================
-
-const scheduleTime = document.getElementById('scheduleTime');
-const setScheduleBtn = document.getElementById('setScheduleBtn');
-const loadScheduleBtn = document.getElementById('loadScheduleBtn');
-const scheduleStatus = document.getElementById('scheduleStatus');
-
-if (loadScheduleBtn) {
-    loadScheduleBtn.onclick = async () => {
-        try {
-            const res = await fetchWithAuth('/api/load-schedule');
-            const data = await res.json();
-            if (data.time) {
-                scheduleTime.value = data.time;
-                scheduleStatus.textContent = `Current schedule: ${data.time}`;
-            } else {
-                scheduleStatus.textContent = 'No schedule set';
-            }
-        } catch (err) {
-            scheduleStatus.textContent = 'Error loading schedule';
-            console.error(err);
-        }
-    };
-}
-
-if (setScheduleBtn) {
-    setScheduleBtn.onclick = async () => {
-        const time = scheduleTime.value;
-        if (!time) {
-            alert('Please select a time');
-            return;
-        }
-
-        try {
-            const res = await fetchWithAuth('/api/set-schedule', {
-                method: 'POST',
-                body: JSON.stringify({ time })
-            });
-            const data = await res.json();
-            if (data.success) {
-                scheduleStatus.textContent = `✅ Schedule set to ${time} (cron: ${data.cron})`;
-                log(`Schedule updated to ${time}`);
-            } else {
-                scheduleStatus.textContent = '❌ ' + (data.error || 'Failed to set schedule');
-            }
-        } catch (err) {
-            scheduleStatus.textContent = '❌ Error setting schedule';
-            console.error(err);
-        }
-    };
-}
-
-// ===============================
-// Init
-// ===============================
-
-(async function init() {
-    const authenticated = await checkAuth();
-    if (authenticated) {
-        log("Dashboard Ready");
-        setStatus("Ready", "success");
-        // Load schedule on page load if elements exist
-        if (loadScheduleBtn) loadScheduleBtn.click();
+    } catch (err) {
+        addLog('❌ Upload error: ' + err.message);
     }
-})();
+}
+
+async function setSchedule() {
+    const time = document.getElementById('scheduleTime').value;
+    if (!time) {
+        addLog('⚠️ Please select a time.');
+        return;
+    }
+    try {
+        await fetchAPI('set-schedule', {
+            method: 'POST',
+            body: JSON.stringify({ time })
+        });
+        addLog(`⏰ Schedule set to ${time}`);
+        document.getElementById('scheduleStatus').textContent = `✅ Schedule set to ${time}`;
+    } catch (err) {
+        addLog('❌ Schedule error: ' + err.message);
+    }
+}
+
+function addLog(msg) {
+    const logs = document.getElementById('logs');
+    const entry = document.createElement('div');
+    entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    logs.prepend(entry);
+    if (logs.children.length > 50) logs.removeChild(logs.lastChild);
+}
