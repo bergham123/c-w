@@ -1,16 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhatsApp Dashboard</title>
-    <link rel="stylesheet" href="style.css" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
-        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="logo">
                 <h2>WhatsApp</h2>
@@ -23,19 +22,15 @@
                 <button class="menu-btn">🚀 Workflow</button>
             </div>
         </aside>
-
-        <!-- Main Content -->
         <main class="content">
-            <!-- Header -->
             <header>
                 <div>
                     <h1>WhatsApp Automation</h1>
-                    <p id="status">System Ready ✅</p>
+                    <p id="status">Ready...</p>
                 </div>
-                <!-- تم حذف زر Logout -->
+                <button id="logout">Logout</button>
             </header>
 
-            <!-- Accounts Section -->
             <section class="card">
                 <div class="card-header">
                     <h2>📞 Accounts</h2>
@@ -48,7 +43,6 @@
                 <div class="small">One number per line</div>
             </section>
 
-            <!-- Messages Section -->
             <section class="card">
                 <div class="card-header">
                     <h2>💬 Messages</h2>
@@ -61,45 +55,17 @@
                 <div class="small">One message per line</div>
             </section>
 
-            <!-- Upload Image Section -->
-            <section class="card">
-                <div class="card-header">
-                    <h2>🖼️ Upload Image</h2>
-                </div>
-                <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                    <input type="file" id="imageInput" accept="image/*" style="flex:1; padding:10px; background:#1e293b; border:1px solid #1f2937; border-radius:8px; color:white;" />
-                    <button id="uploadImageBtn" style="background:#2563eb; border:none; padding:10px 20px; border-radius:8px; color:white;">Upload</button>
-                </div>
-                <div id="uploadResult" style="margin-top:12px; color:#94a3b8;"></div>
-            </section>
-
-            <!-- Schedule Section -->
-            <section class="card">
-                <div class="card-header">
-                    <h2>⏰ Schedule Daily Run</h2>
-                </div>
-                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                    <input type="time" id="scheduleTime" style="padding:10px; background:#1e293b; border:1px solid #1f2937; border-radius:8px; color:white;" />
-                    <button id="setScheduleBtn" style="background:#16a34a; border:none; padding:10px 20px; border-radius:8px; color:white;">Save Schedule</button>
-                    <button id="loadScheduleBtn" style="background:#475569; border:none; padding:10px 20px; border-radius:8px; color:white;">Load Schedule</button>
-                </div>
-                <div id="scheduleStatus" style="margin-top:12px; color:#94a3b8;"></div>
-            </section>
-
-            <!-- Action Buttons (Save All & Run Workflow) -->
             <section class="card action-card">
                 <button id="saveAll" class="save">💾 Save All</button>
                 <button id="runWorkflow" class="run" disabled>🚀 Run Workflow</button>
             </section>
 
-            <!-- Logs Section -->
             <section class="card">
                 <h2>Logs</h2>
                 <div id="logs">Waiting...</div>
             </section>
         </main>
     </div>
-
     <script src="dashboard.js"></script>
 </body>
 </html>
