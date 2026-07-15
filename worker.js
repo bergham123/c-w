@@ -295,7 +295,7 @@ async function handleUploadImage(request, env) {
 }
 
 // ========== HTML الرئيسي (مع التعديلات) ==========
-const HTML_PAGE = `<!DOCTYPE html>
+const HTML_PAGE = String.raw`<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8" />
