@@ -25,9 +25,56 @@ export async function handleSave(request, env) {
   } catch (err) { return jsonResponse({ ok: false, error: String(err.message || err) }, 500); }
 }
 
+// تعديل دالة run workflow لتعيد run_id
 export async function handleRunWorkflow(request, env) {
-  try { await githubRunWorkflow(env); return jsonResponse({ ok: true }); }
-  catch (err) { return jsonResponse({ ok: false, error: String(err.message || err) }, 500); }
+  try {
+    // تشغيل الـ workflow
+    await githubRunWorkflow(env);
+    // بعد التشغيل، نجلب أحدث تشغيل للحصول على run_id
+    const owner = env.GITHUB_OWNER;
+    const repo = env.GITHUB_REPO;
+    const token = env.GITHUB_TOKEN;
+    const runsUrl = `https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=1`;
+    const res = await fetch(runsUrl, {
+      headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" }
+    });
+    if (!res.ok) throw new Error("Failed to fetch runs");
+    const data = await res.json();
+    const runs = data.workflow_runs || [];
+    if (runs.length === 0) throw new Error("No runs found");
+    const runId = runs[0].id;
+    return jsonResponse({ ok: true, run_id: runId });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: String(err.message || err) }, 500);
+  }
+}
+
+// دالة جديدة لجلب سجلات تشغيل معين
+export async function handleWorkflowLogs(request, env) {
+  try {
+    const url = new URL(request.url);
+    const runId = url.searchParams.get("run_id");
+    if (!runId) return jsonResponse({ ok: false, error: "Missing run_id" }, 400);
+    
+    const owner = env.GITHUB_OWNER;
+    const repo = env.GITHUB_REPO;
+    const token = env.GITHUB_TOKEN;
+    
+    // جلب السجلات النصية (محاولة 1)
+    const logsUrl = `https://api.github.com/repos/${owner}/${repo}/actions/runs/${runId}/attempts/1/logs`;
+    const res = await fetch(logsUrl, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (res.status === 404) {
+      // قد يكون التشغيل لم يبدأ بعد
+      return jsonResponse({ ok: true, logs: "", status: "pending" });
+    }
+    if (!res.ok) throw new Error(`Logs fetch error: ${res.status}`);
+    const text = await res.text();
+    return jsonResponse({ ok: true, logs: text, status: "running" });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: err.message }, 500);
+  }
 }
 
 export async function handleUploadImage(request, env) {
@@ -82,7 +129,6 @@ export async function handleGetStats(request, env) {
   } catch (err) { return jsonResponse({ ok: false, error: String(err.message || err) }, 500); }
 }
 
-// دوال جديدة للصور
 export async function handleListImages(request, env) {
   try {
     const { files } = await githubListFiles(env, getImagesDir(env));
@@ -105,5 +151,4 @@ export async function handleDeleteImage(request, env) {
   } catch (err) { return jsonResponse({ ok: false, error: String(err.message || err) }, 500); }
 }
 
-// إعادة تصدير معالجات الجدولة
 export { handleLoadSchedule, handleSaveSchedule };
