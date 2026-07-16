@@ -61,3 +61,14 @@ export async function githubListFiles(env, folder) {
   const files = data.filter(item => item.type === "file" && item.name.endsWith(".log")).map(item => ({ name: item.name, path: item.path, sha: item.sha, size: item.size, download_url: item.download_url }));
   return { files, exists: true };
 }
+
+// src/github.js - إضافة في نهاية الملف
+
+export async function githubDeleteFile(env, path, sha, message) {
+  const branch = env.GITHUB_BRANCH || "main";
+  const url = "https://api.github.com/repos/" + env.GITHUB_OWNER + "/" + env.GITHUB_REPO + "/contents/" + encodeURIComponent(path);
+  const body = { message: message || "Delete " + path, sha: sha, branch: branch };
+  const res = await fetch(url, { method: "DELETE", headers: ghHeaders(env), body: JSON.stringify(body) });
+  if (!res.ok) throw new Error("GitHub DELETE error " + res.status + ": " + await res.text());
+  return await res.json();
+}
