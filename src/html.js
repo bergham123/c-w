@@ -9,7 +9,6 @@ export const HTML_PAGE = `<!DOCTYPE html>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-  /* نفس الستايلات السابقة، لا تغيير */
   :root {
     --bg-main: #0f172a;
     --card-bg: rgba(30, 41, 59, 0.7);
@@ -152,18 +151,35 @@ export const HTML_PAGE = `<!DOCTYPE html>
   .log-file-btn.active { background: var(--accent); border-color: var(--accent); }
   .log-content { background: #0f172a; border-radius: 12px; padding: 16px; overflow-y: auto; font-family: monospace; font-size: 13px; flex-grow: 1; }
 
-  /* معرض الصور */
-  #imageGallery { margin-top: 16px; }
-  #imageList { display: flex; flex-wrap: wrap; gap: 12px; }
-  .image-item { position: relative; width: 100px; height: 100px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); flex-shrink: 0; }
+  .image-item {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    flex-shrink: 0;
+  }
   .image-item img { width: 100%; height: 100%; object-fit: cover; }
   .image-item .delete-btn {
-    position: absolute; top: 4px; right: 4px;
-    background: var(--danger); border: none; color: white;
-    border-radius: 50%; width: 28px; height: 28px;
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: var(--danger);
+    border: none;
+    color: white;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
   }
+  #imageGallery { margin-top: 16px; }
+  #imageList { display: flex; flex-wrap: wrap; gap: 12px; }
 </style>
 </head>
 <body>
@@ -176,7 +192,6 @@ export const HTML_PAGE = `<!DOCTYPE html>
   </div>
   
   <div class="grid">
-    <!-- الرسائل -->
     <div class="card">
       <div class="card-header"><i class="fas fa-comment-dots"></i><h2>الرسائل</h2></div>
       <div class="card-hint">كل رسالة في سطر، تُحفظ كـ JSON array</div>
@@ -188,7 +203,6 @@ export const HTML_PAGE = `<!DOCTYPE html>
       <div class="status" id="messagesStatus"></div>
     </div>
 
-    <!-- جهات الاتصال -->
     <div class="card">
       <div class="card-header"><i class="fas fa-address-book"></i><h2>جهات الاتصال</h2></div>
       <div class="card-hint">كل رقم في سطر، يُحفظ كـ JSON array</div>
@@ -200,10 +214,9 @@ export const HTML_PAGE = `<!DOCTYPE html>
       <div class="status" id="contactsStatus"></div>
     </div>
 
-    <!-- الجدولة (مع توضيح توقيت المغرب) -->
     <div class="card">
       <div class="card-header"><i class="fas fa-clock"></i><h2>توقيت التشغيل التلقائي</h2></div>
-      <div class="card-hint">تعديل جدولة الـ workflow (Cron) - الوقت المدخل هو بتوقيت المغرب (سيتم تحويله تلقائياً إلى UTC بطرح ساعتين)</div>
+      <div class="card-hint">تعديل جدولة الـ workflow - الوقت المدخل بتوقيت المغرب (يُطرح ساعتين لتخزينه في UTC)</div>
       <div style="margin-bottom: 15px;">
         <span class="schedule-status inactive" id="scheduleIndicator">غير مفعل</span>
         <span id="currentCronDisplay" style="font-size:12px;color:var(--text-muted);margin-right:10px;"></span>
@@ -219,7 +232,6 @@ export const HTML_PAGE = `<!DOCTYPE html>
       <div class="status" id="scheduleStatus"></div>
     </div>
 
-    <!-- الصور + معرض + حذف -->
     <div class="card">
       <div class="card-header"><i class="fas fa-images"></i><h2>رفع الصور</h2></div>
       <div class="card-hint">ستُرفع إلى مجلد <code>images/</code> - الحد الأقصى 3 صور</div>
@@ -231,7 +243,6 @@ export const HTML_PAGE = `<!DOCTYPE html>
         <button class="btn btn-primary" id="uploadImagesBtn"><i class="fas fa-upload"></i> رفع الصور</button>
         <button class="btn" id="refreshImagesBtn"><i class="fas fa-sync"></i> تحديث القائمة</button>
       </div>
-      <!-- معرض الصور -->
       <div id="imageGallery" style="display: none; margin-top: 16px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
           <span style="font-size:14px; color:var(--text-muted);">الصور الموجودة (<span id="imageCount">0</span>/3)</span>
@@ -242,12 +253,10 @@ export const HTML_PAGE = `<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- الإحصائيات والرسوم البيانية -->
   <div class="card" style="margin-top: 24px;">
     <div class="card-header"><i class="fas fa-chart-line"></i><h2>إحصائيات الإرسال</h2></div>
     <div class="card-hint">عرض تقرير المحاولات والنجاح والفشل مع رسم بياني تفاعلي</div>
     <button class="btn btn-primary" id="loadStatsBtn"><i class="fas fa-database"></i> تحميل الإحصائيات</button>
-    
     <div id="statsContainer" style="display:none; margin-top: 20px;">
       <div style="max-height: 300px; overflow-y: auto; margin-bottom: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
         <table class="stats-table">
@@ -262,7 +271,6 @@ export const HTML_PAGE = `<!DOCTYPE html>
     <div class="status" id="statsStatus"></div>
   </div>
 
-  <!-- السجلات والتشغيل -->
   <div class="grid" style="margin-top: 24px; grid-template-columns: 2fr 1fr;">
     <div class="card">
       <div class="card-header"><i class="fas fa-terminal"></i><h2>سجلات التشغيل</h2></div>
@@ -279,7 +287,6 @@ export const HTML_PAGE = `<!DOCTYPE html>
   </div>
 </div>
 
-<!-- مودال السجلات -->
 <div class="modal-overlay" id="logsModal">
   <div class="modal">
     <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -292,10 +299,8 @@ export const HTML_PAGE = `<!DOCTYPE html>
 </div>
 
 <script>
-// ===== Helpers =====
 function setStatus(el, msg, type) { el.textContent = msg; el.className = "status" + (type ? " " + type : ""); }
 
-// ===== Messages & Contacts =====
 async function loadFile(type, areaEl, statusEl) {
   setStatus(statusEl, "جاري التحميل...", "");
   try {
@@ -320,7 +325,6 @@ document.getElementById("saveMessagesBtn").onclick = () => saveFile("messages", 
 document.getElementById("loadContactsBtn").onclick = () => loadFile("contacts", document.getElementById("contactsArea"), document.getElementById("contactsStatus"));
 document.getElementById("saveContactsBtn").onclick = () => saveFile("contacts", document.getElementById("contactsArea"), document.getElementById("contactsStatus"));
 
-// ===== Images =====
 const imagesInput = document.getElementById("imagesInput");
 const previewArea = document.getElementById("imagePreviewArea");
 let selectedFiles = [];
@@ -347,35 +351,24 @@ function renderPreviews() {
   });
 }
 
-// تحميل قائمة الصور
 async function loadImages() {
   const gallery = document.getElementById('imageGallery');
   const list = document.getElementById('imageList');
   const countSpan = document.getElementById('imageCount');
-  
   try {
     const res = await fetch('/api/images');
     const data = await res.json();
     if (!data.ok) throw new Error(data.error);
-    
     const files = data.files || [];
     countSpan.textContent = files.length;
-    
-    if (files.length === 0) {
-      gallery.style.display = 'none';
-      return;
-    }
-    
+    if (files.length === 0) { gallery.style.display = 'none'; return; }
     gallery.style.display = 'block';
     list.innerHTML = '';
-    
     files.forEach(file => {
       const div = document.createElement('div');
       div.className = 'image-item';
-      
       const img = document.createElement('img');
-      img.src = file.download_url || \`https://raw.githubusercontent.com/\${window.ENV?.GITHUB_OWNER || 'bergham123'}/\${window.ENV?.GITHUB_REPO || 'wtsc'}/main/images/\${file.name}\`;
-      
+      img.src = file.download_url || \`https://raw.githubusercontent.com/bergham123/wtsc/main/images/\${file.name}\`;
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'delete-btn';
       deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
@@ -389,9 +382,7 @@ async function loadImages() {
           });
           const dataDel = await resDel.json();
           if (!dataDel.ok) throw new Error(dataDel.error);
-          // إزالة العنصر
           div.remove();
-          // تحديث العدد
           const newCount = parseInt(countSpan.textContent) - 1;
           countSpan.textContent = newCount;
           if (newCount === 0) gallery.style.display = 'none';
@@ -400,7 +391,6 @@ async function loadImages() {
           setStatus(document.getElementById('imagesStatus'), 'خطأ في الحذف: ' + err.message, 'err');
         }
       };
-      
       div.appendChild(img);
       div.appendChild(deleteBtn);
       list.appendChild(div);
@@ -410,17 +400,10 @@ async function loadImages() {
     gallery.style.display = 'none';
   }
 }
-
 document.getElementById('refreshImagesBtn').onclick = loadImages;
 
-// رفع الصور مع التحقق من الحد الأقصى
 document.getElementById('uploadImagesBtn').onclick = async function() {
-  if (selectedFiles.length === 0) { 
-    setStatus(document.getElementById('imagesStatus'), 'اختر صورة أولاً', 'err'); 
-    return; 
-  }
-  
-  // تحقق من العدد الحالي أولاً
+  if (selectedFiles.length === 0) { setStatus(document.getElementById('imagesStatus'), 'اختر صورة أولاً', 'err'); return; }
   try {
     const resCheck = await fetch('/api/images');
     const dataCheck = await resCheck.json();
@@ -439,7 +422,6 @@ document.getElementById('uploadImagesBtn').onclick = async function() {
     setStatus(document.getElementById('imagesStatus'), 'خطأ في التحقق من عدد الصور: ' + err.message, 'err');
     return;
   }
-
   let success = 0;
   for (const file of selectedFiles) {
     try {
@@ -451,14 +433,11 @@ document.getElementById('uploadImagesBtn').onclick = async function() {
   }
   setStatus(document.getElementById('imagesStatus'), success + "/" + selectedFiles.length + " تم رفعها", success === selectedFiles.length ? "ok" : "err");
   if (success === selectedFiles.length) { selectedFiles = []; imagesInput.value = ""; renderPreviews(); }
-  // تحديث قائمة الصور بعد الرفع
   loadImages();
 };
 
-// تحميل الصور تلقائياً
 loadImages();
 
-// ===== Workflow =====
 document.getElementById("runWorkflowBtn").onclick = async function() {
   const st = document.getElementById("workflowStatus");
   setStatus(st, "جاري التشغيل...", "");
@@ -470,7 +449,6 @@ document.getElementById("runWorkflowBtn").onclick = async function() {
   } catch (err) { setStatus(st, "خطأ: " + err.message, "err"); }
 };
 
-// ===== Logs =====
 const logsModal = document.getElementById("logsModal");
 document.getElementById("viewLogsBtn").onclick = async function() {
   logsModal.classList.add("active");
@@ -505,7 +483,6 @@ document.getElementById("viewLogsBtn").onclick = async function() {
 document.getElementById("closeLogsModal").onclick = () => logsModal.classList.remove("active");
 logsModal.addEventListener("click", e => { if (e.target === logsModal) logsModal.classList.remove("active"); });
 
-// ===== Schedule (مع توقيت المغرب) =====
 const scheduleStatus = document.getElementById("scheduleStatus");
 const hourInput = document.getElementById("hourInput");
 const minuteInput = document.getElementById("minuteInput");
@@ -531,23 +508,17 @@ async function loadSchedule() {
     }
   } catch (err) { setStatus(scheduleStatus, "خطأ: " + err.message, "err"); }
 }
-
 async function saveSchedule(cron) {
   setStatus(scheduleStatus, "جاري الحفظ...", "");
   try {
-    const res = await fetch("/api/schedule", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "add", cron: cron })
-    });
+    const res = await fetch("/api/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add", cron: cron }) });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error);
     setStatus(scheduleStatus, "تم التحديث ✓ (" + cron + ")", "ok");
     loadSchedule();
   } catch (err) { setStatus(scheduleStatus, "خطأ: " + err.message, "err"); }
 }
-
 document.getElementById("loadScheduleBtn").onclick = loadSchedule;
-
 document.getElementById("updateScheduleBtn").onclick = function() {
   const h = parseInt(hourInput.value, 10);
   const m = parseInt(minuteInput.value, 10);
@@ -558,10 +529,8 @@ document.getElementById("updateScheduleBtn").onclick = function() {
   const cron = m + " " + h + " * * *";
   saveSchedule(cron);
 };
+loadSchedule();
 
-loadSchedule(); // تحميل تلقائي
-
-// ===== Statistics & Charts =====
 let statsChartInstance = null;
 document.getElementById("loadStatsBtn").onclick = async function() {
   const st = document.getElementById("statsStatus");
@@ -571,14 +540,11 @@ document.getElementById("loadStatsBtn").onclick = async function() {
     const data = await res.json();
     if (!data.ok) throw new Error(data.error);
     if (data.data.length === 0) { setStatus(st, "لا توجد إحصائيات", "err"); return; }
-    
     document.getElementById("statsContainer").style.display = "block";
     setStatus(st, "✓ تم التحميل", "ok");
-    
     const tbody = document.getElementById("statsBody");
     tbody.innerHTML = "";
     let totalAtt = 0, totalSuc = 0, totalFail = 0;
-    
     data.data.forEach(row => {
       totalAtt += row.attempted || 0;
       totalSuc += row.success || 0;
@@ -587,17 +553,13 @@ document.getElementById("loadStatsBtn").onclick = async function() {
       tr.innerHTML = "<td>" + row.date + "</td><td>" + (row.attempted||0) + "</td><td style='color:var(--success)'>" + (row.success||0) + "</td><td style='color:var(--danger)'>" + (row.failed||0) + "</td>";
       tbody.appendChild(tr);
     });
-    
     const trTotal = document.createElement("tr");
     trTotal.style.fontWeight = "bold";
     trTotal.style.borderTop = "2px solid var(--accent)";
     trTotal.innerHTML = "<td>المجموع</td><td>" + totalAtt + "</td><td style='color:var(--success)'>" + totalSuc + "</td><td style='color:var(--danger)'>" + totalFail + "</td>";
     tbody.appendChild(trTotal);
-    
-    // Chart.js
     const ctx = document.getElementById('statsChart').getContext('2d');
     if (statsChartInstance) statsChartInstance.destroy();
-    
     statsChartInstance = new Chart(ctx, {
       type: 'bar',
       data: {
