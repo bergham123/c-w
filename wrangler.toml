@@ -2,14 +2,23 @@ name = "managedash"
 main = "worker.js"
 compatibility_date = "2024-11-01"
 
-# ملاحظة: الـ secrets (GITHUB_TOKEN) ما تحطهاش هنا فهاد الملف
-# دخلها من Cloudflare Dashboard > Workers > Settings > Variables and Secrets
-# أو عبر الأمر: wrangler secret put GITHUB_TOKEN
-
 [vars]
 GITHUB_OWNER = "bergham123"
 GITHUB_REPO = "wtsc"
 GITHUB_BRANCH = "main"
 WORKFLOW_FILE = "send.yaml"
 MESSAGES_PATH = "message.json"
-CONTACTS_PATH  = "accounts.json"
+CONTACTS_PATH = "accounts.json"
+
+# ===========================
+# Durable Object
+# ===========================
+
+[[durable_objects.bindings]]
+name = "LIVE_LOGS"
+class_name = "LiveLogs"
+
+[[migrations]]
+tag = "v1"
+
+new_sqlite_classes = ["LiveLogs"]
