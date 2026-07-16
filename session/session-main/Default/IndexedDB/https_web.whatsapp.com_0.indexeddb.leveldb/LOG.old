@@ -1,3 +1,9 @@
-2026/07/16-21:05:03.286 b3c Reusing MANIFEST /home/runner/work/wtsc/wtsc/session/session-main/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2026/07/16-21:05:03.287 b3c Recovering log #340
-2026/07/16-21:05:03.366 b3c Reusing old log /home/runner/work/wtsc/wtsc/session/session-main/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000340.log 
+2026/07/16-21:23:04.451 bb0 Reusing MANIFEST /home/runner/work/wtsc/wtsc/session/session-main/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/07/16-21:23:04.452 bb0 Recovering log #340
+2026/07/16-21:23:04.520 bb0 Reusing old log /home/runner/work/wtsc/wtsc/session/session-main/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000340.log 
+2026/07/16-21:23:08.881 bab Level-0 table #354: started
+2026/07/16-21:23:08.931 bab Level-0 table #354: 1266237 bytes OK
+2026/07/16-21:23:08.938 bab Delete type=0 #340
+2026/07/16-21:23:08.961 ba9 Compacting 1@1 + 9@2 files
+2026/07/16-21:23:09.155 ba9 Generated table #355@1: 68585 keys, 2266752 bytes
+2026/07/16-21:23:09.256 ba9 Generated table #356@1: 6059 keys, 2150457 bytes
