@@ -151,6 +151,19 @@ export const HTML_PAGE = `<!DOCTYPE html>
   .log-file-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 16px; border-radius: 20px; cursor: pointer; }
   .log-file-btn.active { background: var(--accent); border-color: var(--accent); }
   .log-content { background: #0f172a; border-radius: 12px; padding: 16px; overflow-y: auto; font-family: monospace; font-size: 13px; flex-grow: 1; }
+
+  /* معرض الصور */
+  #imageGallery { margin-top: 16px; }
+  #imageList { display: flex; flex-wrap: wrap; gap: 12px; }
+  .image-item { position: relative; width: 100px; height: 100px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); flex-shrink: 0; }
+  .image-item img { width: 100%; height: 100%; object-fit: cover; }
+  .image-item .delete-btn {
+    position: absolute; top: 4px; right: 4px;
+    background: var(--danger); border: none; color: white;
+    border-radius: 50%; width: 28px; height: 28px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
 </style>
 </head>
 <body>
@@ -187,10 +200,10 @@ export const HTML_PAGE = `<!DOCTYPE html>
       <div class="status" id="contactsStatus"></div>
     </div>
 
-    <!-- الجدولة (زرين فقط) -->
+    <!-- الجدولة (مع توضيح توقيت المغرب) -->
     <div class="card">
       <div class="card-header"><i class="fas fa-clock"></i><h2>توقيت التشغيل التلقائي</h2></div>
-      <div class="card-hint">تعديل جدولة الـ workflow (Cron)</div>
+      <div class="card-hint">تعديل جدولة الـ workflow (Cron) - الوقت المدخل هو بتوقيت المغرب (سيتم تحويله تلقائياً إلى UTC بطرح ساعتين)</div>
       <div style="margin-bottom: 15px;">
         <span class="schedule-status inactive" id="scheduleIndicator">غير مفعل</span>
         <span id="currentCronDisplay" style="font-size:12px;color:var(--text-muted);margin-right:10px;"></span>
@@ -206,18 +219,25 @@ export const HTML_PAGE = `<!DOCTYPE html>
       <div class="status" id="scheduleStatus"></div>
     </div>
 
-    <!-- الصور -->
+    <!-- الصور + معرض + حذف -->
     <div class="card">
       <div class="card-header"><i class="fas fa-images"></i><h2>رفع الصور</h2></div>
-      <div class="card-hint">ستُرفع إلى مجلد <code>images/</code></div>
+      <div class="card-hint">ستُرفع إلى مجلد <code>images/</code> - الحد الأقصى 3 صور</div>
       <div style="background: rgba(15, 23, 42, 0.8); padding: 15px; border-radius: 12px; border: 1px dashed var(--border-color);">
         <input type="file" id="imagesInput" accept="image/*" multiple style="width:100%; margin-bottom: 10px;" />
         <div id="imagePreviewArea" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
       </div>
       <div class="btn-row">
         <button class="btn btn-primary" id="uploadImagesBtn"><i class="fas fa-upload"></i> رفع الصور</button>
+        <button class="btn" id="refreshImagesBtn"><i class="fas fa-sync"></i> تحديث القائمة</button>
       </div>
-      <div class="file-list" id="imagesList" style="margin-top:10px; font-size:12px; color:var(--text-muted);"></div>
+      <!-- معرض الصور -->
+      <div id="imageGallery" style="display: none; margin-top: 16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <span style="font-size:14px; color:var(--text-muted);">الصور الموجودة (<span id="imageCount">0</span>/3)</span>
+        </div>
+        <div id="imageList"></div>
+      </div>
       <div class="status" id="imagesStatus"></div>
     </div>
   </div>
@@ -326,8 +346,100 @@ function renderPreviews() {
     reader.readAsDataURL(file);
   });
 }
-document.getElementById("uploadImagesBtn").onclick = async function() {
-  if (selectedFiles.length === 0) { setStatus(document.getElementById("imagesStatus"), "اختر صورة أولاً", "err"); return; }
+
+// تحميل قائمة الصور
+async function loadImages() {
+  const gallery = document.getElementById('imageGallery');
+  const list = document.getElementById('imageList');
+  const countSpan = document.getElementById('imageCount');
+  
+  try {
+    const res = await fetch('/api/images');
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    
+    const files = data.files || [];
+    countSpan.textContent = files.length;
+    
+    if (files.length === 0) {
+      gallery.style.display = 'none';
+      return;
+    }
+    
+    gallery.style.display = 'block';
+    list.innerHTML = '';
+    
+    files.forEach(file => {
+      const div = document.createElement('div');
+      div.className = 'image-item';
+      
+      const img = document.createElement('img');
+      img.src = file.download_url || \`https://raw.githubusercontent.com/\${window.ENV?.GITHUB_OWNER || 'bergham123'}/\${window.ENV?.GITHUB_REPO || 'wtsc'}/main/images/\${file.name}\`;
+      
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+      deleteBtn.onclick = async () => {
+        if (!confirm(\`تأكيد حذف الصورة "\${file.name}"؟\`)) return;
+        try {
+          const resDel = await fetch('/api/delete-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: file.name, sha: file.sha })
+          });
+          const dataDel = await resDel.json();
+          if (!dataDel.ok) throw new Error(dataDel.error);
+          // إزالة العنصر
+          div.remove();
+          // تحديث العدد
+          const newCount = parseInt(countSpan.textContent) - 1;
+          countSpan.textContent = newCount;
+          if (newCount === 0) gallery.style.display = 'none';
+          setStatus(document.getElementById('imagesStatus'), 'تم حذف الصورة ✓', 'ok');
+        } catch (err) {
+          setStatus(document.getElementById('imagesStatus'), 'خطأ في الحذف: ' + err.message, 'err');
+        }
+      };
+      
+      div.appendChild(img);
+      div.appendChild(deleteBtn);
+      list.appendChild(div);
+    });
+  } catch (err) {
+    console.error('Error loading images:', err);
+    gallery.style.display = 'none';
+  }
+}
+
+document.getElementById('refreshImagesBtn').onclick = loadImages;
+
+// رفع الصور مع التحقق من الحد الأقصى
+document.getElementById('uploadImagesBtn').onclick = async function() {
+  if (selectedFiles.length === 0) { 
+    setStatus(document.getElementById('imagesStatus'), 'اختر صورة أولاً', 'err'); 
+    return; 
+  }
+  
+  // تحقق من العدد الحالي أولاً
+  try {
+    const resCheck = await fetch('/api/images');
+    const dataCheck = await resCheck.json();
+    if (!dataCheck.ok) throw new Error(dataCheck.error);
+    const currentCount = dataCheck.files ? dataCheck.files.length : 0;
+    if (currentCount >= 3) {
+      setStatus(document.getElementById('imagesStatus'), 'لا يمكن رفع أكثر من 3 صور. قم بحذف بعض الصور أولاً.', 'err');
+      return;
+    }
+    const remaining = 3 - currentCount;
+    if (selectedFiles.length > remaining) {
+      setStatus(document.getElementById('imagesStatus'), \`يمكنك رفع \${remaining} صورة فقط (الحد الأقصى 3)\`, 'err');
+      return;
+    }
+  } catch (err) {
+    setStatus(document.getElementById('imagesStatus'), 'خطأ في التحقق من عدد الصور: ' + err.message, 'err');
+    return;
+  }
+
   let success = 0;
   for (const file of selectedFiles) {
     try {
@@ -337,9 +449,14 @@ document.getElementById("uploadImagesBtn").onclick = async function() {
       if (data.ok) success++;
     } catch (err) {}
   }
-  setStatus(document.getElementById("imagesStatus"), success + "/" + selectedFiles.length + " تم رفعها", success === selectedFiles.length ? "ok" : "err");
+  setStatus(document.getElementById('imagesStatus'), success + "/" + selectedFiles.length + " تم رفعها", success === selectedFiles.length ? "ok" : "err");
   if (success === selectedFiles.length) { selectedFiles = []; imagesInput.value = ""; renderPreviews(); }
+  // تحديث قائمة الصور بعد الرفع
+  loadImages();
 };
+
+// تحميل الصور تلقائياً
+loadImages();
 
 // ===== Workflow =====
 document.getElementById("runWorkflowBtn").onclick = async function() {
@@ -388,7 +505,7 @@ document.getElementById("viewLogsBtn").onclick = async function() {
 document.getElementById("closeLogsModal").onclick = () => logsModal.classList.remove("active");
 logsModal.addEventListener("click", e => { if (e.target === logsModal) logsModal.classList.remove("active"); });
 
-// ===== Schedule (زرين فقط) =====
+// ===== Schedule (مع توقيت المغرب) =====
 const scheduleStatus = document.getElementById("scheduleStatus");
 const hourInput = document.getElementById("hourInput");
 const minuteInput = document.getElementById("minuteInput");
@@ -403,8 +520,8 @@ async function loadSchedule() {
     const disp = document.getElementById("currentCronDisplay");
     if (data.hasSchedule && data.cron) {
       ind.textContent = "مفعل"; ind.className = "schedule-status active";
-      disp.textContent = "التوقيت: " + data.cron;
-      const parts = data.cron.trim().split(/\s+/);
+      disp.textContent = "التوقيت (المغرب): " + data.cron;
+      const parts = data.cron.trim().split(/\\s+/);
       if (parts.length >= 2) { minuteInput.value = parts[0]; hourInput.value = parts[1]; }
       setStatus(scheduleStatus, "تم التحميل ✓", "ok");
     } else {
@@ -442,7 +559,7 @@ document.getElementById("updateScheduleBtn").onclick = function() {
   saveSchedule(cron);
 };
 
-loadSchedule(); // تحميل تلقائي عند بدء الصفحة
+loadSchedule(); // تحميل تلقائي
 
 // ===== Statistics & Charts =====
 let statsChartInstance = null;
@@ -502,125 +619,7 @@ document.getElementById("loadStatsBtn").onclick = async function() {
     });
   } catch (err) { setStatus(st, "خطأ: " + err.message, "err"); }
 };
-
-// داخل الـ <script> في html.js
-
-// دالة تحميل الصور
-async function loadImages() {
-  const gallery = document.getElementById('imageGallery');
-  const list = document.getElementById('imageList');
-  const countSpan = document.getElementById('imageCount');
-  
-  try {
-    const res = await fetch('/api/images');
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error);
-    
-    const files = data.files || [];
-    countSpan.textContent = files.length;
-    
-    if (files.length === 0) {
-      gallery.style.display = 'none';
-      return;
-    }
-    
-    gallery.style.display = 'block';
-    list.innerHTML = '';
-    
-    files.forEach(file => {
-      const div = document.createElement('div');
-      div.style.cssText = 'position:relative; width:100px; height:100px; border-radius:12px; overflow:hidden; border:1px solid var(--border-color);';
-      
-      // عرض الصورة (نستخدم raw.githubusercontent.com أو رابط download_url)
-      const img = document.createElement('img');
-      img.src = file.download_url || `https://raw.githubusercontent.com/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/${env.GITHUB_BRANCH || 'main'}/images/${file.name}`;
-      img.style.cssText = 'width:100%; height:100%; object-fit:cover;';
-      
-      const deleteBtn = document.createElement('button');
-      deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
-      deleteBtn.style.cssText = 'position:absolute; top:4px; right:4px; background:var(--danger); border:none; color:white; border-radius:50%; width:28px; height:28px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:12px; box-shadow:0 2px 8px rgba(0,0,0,0.5);';
-      deleteBtn.onclick = async () => {
-        if (!confirm(`تأكيد حذف الصورة "${file.name}"؟`)) return;
-        try {
-          const resDel = await fetch('/api/delete-image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename: file.name, sha: file.sha })
-          });
-          const dataDel = await resDel.json();
-          if (!dataDel.ok) throw new Error(dataDel.error);
-          // إزالة العنصر من الواجهة
-          div.remove();
-          // تحديث العدد
-          const newCount = parseInt(countSpan.textContent) - 1;
-          countSpan.textContent = newCount;
-          if (newCount === 0) gallery.style.display = 'none';
-          // إظهار رسالة نجاح
-          setStatus(document.getElementById('imagesStatus'), 'تم حذف الصورة ✓', 'ok');
-        } catch (err) {
-          setStatus(document.getElementById('imagesStatus'), 'خطأ في الحذف: ' + err.message, 'err');
-        }
-      };
-      
-      div.appendChild(img);
-      div.appendChild(deleteBtn);
-      list.appendChild(div);
-    });
-  } catch (err) {
-    console.error('Error loading images:', err);
-    gallery.style.display = 'none';
-  }
-}
-
-// ربط زر التحديث
-document.getElementById('refreshImagesBtn').onclick = loadImages;
-
-// تحميل الصور تلقائياً عند فتح الصفحة
-loadImages();
-
-// تعديل رفع الصور للتحقق من الحد الأقصى قبل الرفع
-document.getElementById('uploadImagesBtn').onclick = async function() {
-  if (selectedFiles.length === 0) { 
-    setStatus(document.getElementById('imagesStatus'), 'اختر صورة أولاً', 'err'); 
-    return; 
-  }
-  
-  // تحقق من العدد الحالي أولاً
-  try {
-    const resCheck = await fetch('/api/images');
-    const dataCheck = await resCheck.json();
-    if (!dataCheck.ok) throw new Error(dataCheck.error);
-    const currentCount = dataCheck.files ? dataCheck.files.length : 0;
-    if (currentCount >= 3) {
-      setStatus(document.getElementById('imagesStatus'), 'لا يمكن رفع أكثر من 3 صور. قم بحذف بعض الصور أولاً.', 'err');
-      return;
-    }
-    // تأكد أن عدد الملفات المختارة لا يتجاوز المساحة المتبقية
-    const remaining = 3 - currentCount;
-    if (selectedFiles.length > remaining) {
-      setStatus(document.getElementById('imagesStatus'), `يمكنك رفع ${remaining} صورة فقط (الحد الأقصى 3)`, 'err');
-      return;
-    }
-  } catch (err) {
-    setStatus(document.getElementById('imagesStatus'), 'خطأ في التحقق من عدد الصور: ' + err.message, 'err');
-    return;
-  }
-
-  // باقي كود الرفع كما هو
-  let success = 0;
-  for (const file of selectedFiles) {
-    try {
-      const base64 = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result.split(",")[1]); r.onerror = reject; r.readAsDataURL(file); });
-      const res = await fetch("/api/upload-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ filename: file.name, dataBase64: base64 }) });
-      const data = await res.json();
-      if (data.ok) success++;
-    } catch (err) {}
-  }
-  setStatus(document.getElementById('imagesStatus'), success + "/" + selectedFiles.length + " تم رفعها", success === selectedFiles.length ? "ok" : "err");
-  if (success === selectedFiles.length) { selectedFiles = []; imagesInput.value = ""; renderPreviews(); }
-  // تحديث قائمة الصور بعد الرفع
-  loadImages();
-};
 </script>
 </body>
-</html>`;  
+</html>
+`;
