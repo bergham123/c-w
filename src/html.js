@@ -10,13 +10,12 @@ export const HTML_PAGE = `<!DOCTYPE html>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   :root {
-    /* WhatsApp Dark Theme Colors */
     --bg-main: #111B21;
     --card-bg: #202C33;
     --border-color: #2A3942;
     --text-main: #E9EDEF;
     --text-muted: #8696A0;
-    --accent: #25D366; /* WhatsApp Green */
+    --accent: #25D366;
     --accent-glow: rgba(37, 211, 102, 0.2);
     --success: #25D366;
     --danger: #F15C6D;
@@ -27,64 +26,98 @@ export const HTML_PAGE = `<!DOCTYPE html>
   body {
     font-family: 'Tajawal', sans-serif;
     background: var(--bg-main);
-    background-image: 
-      radial-gradient(circle at 0% 0%, rgba(37, 211, 102, 0.05) 0%, transparent 50%),
-      radial-gradient(circle at 100% 100%, rgba(10, 107, 94, 0.1) 0%, transparent 50%);
     color: var(--text-main);
     min-height: 100vh;
-    padding: 20px;
-  }
-  .container {
-    max-width: 1200px;
-    margin: auto;
-    background: var(--bg-main);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 30px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  }
-  .header {
     display: flex;
-    justify-content: space-between;
+    gap: 0;
+  }
+
+  /* Sidebar Styles */
+  .sidebar {
+    width: 300px;
+    background: var(--card-bg);
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    border-left: 1px solid var(--border-color);
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
+  }
+  .sidebar-header {
+    display: flex;
     align-items: center;
-    margin-bottom: 30px;
+    gap: 12px;
+    margin-bottom: 40px;
     padding-bottom: 20px;
     border-bottom: 1px solid var(--border-color);
   }
-  .logo-area { display: flex; align-items: center; gap: 15px; }
   .logo-icon {
-    width: 48px; height: 48px;
+    width: 40px; height: 40px;
     background: var(--accent);
-    border-radius: 12px;
+    border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 24px; color: #111B21;
-    box-shadow: 0 4px 15px var(--accent-glow);
+    font-size: 20px; color: #111B21;
   }
-  .logo-text { font-size: 22px; font-weight: 800; letter-spacing: 0.5px; color: var(--text-main); }
+  .logo-text { font-size: 18px; font-weight: 800; }
   .logo-text span { color: var(--accent); }
   
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
-  
+  .nav-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex-grow: 1;
+  }
+  .sidebar-card {
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 16px;
+    transition: border-color 0.3s;
+  }
+  .sidebar-card:hover { border-color: var(--accent); }
+
+  /* Main Content Styles */
+  .main-content {
+    flex: 1;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    max-width: calc(100% - 300px);
+    width: 100%;
+  }
+
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 1024px) {
+    body { flex-direction: column; }
+    .sidebar { width: 100%; height: auto; position: relative; border-left: none; border-bottom: 1px solid var(--border-color); }
+    .main-content { max-width: 100%; padding: 20px; }
+    .content-grid { grid-template-columns: 1fr; }
+  }
+
   .card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 24px;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    transition: border-color 0.3s ease;
   }
-  .card:hover { 
-    border-color: var(--accent); 
-    box-shadow: 0 0 15px var(--accent-glow);
-  }
+  .card:hover { border-color: rgba(37, 211, 102, 0.4); }
   .card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
   .card-header i { font-size: 18px; color: var(--accent); }
-  .card-header h2 { font-size: 17px; font-weight: 700; }
-  .card-hint { color: var(--text-muted); font-size: 13px; margin-bottom: 16px; }
+  .card-header h2 { font-size: 16px; font-weight: 700; }
+  .card-hint { color: var(--text-muted); font-size: 12px; margin-bottom: 16px; }
   
   textarea {
     width: 100%;
-    min-height: 160px;
+    min-height: 140px;
     background: var(--input-bg);
     color: var(--text-main);
     border: 1px solid var(--border-color);
@@ -94,7 +127,6 @@ export const HTML_PAGE = `<!DOCTYPE html>
     font-size: 13px;
     resize: vertical;
     direction: ltr; text-align: left;
-    transition: border-color 0.2s;
   }
   textarea:focus { outline: none; border-color: var(--accent); }
   
@@ -103,35 +135,35 @@ export const HTML_PAGE = `<!DOCTYPE html>
     background: var(--input-bg);
     color: var(--text-main);
     border: 1px solid var(--border-color);
-    padding: 10px 18px;
+    padding: 10px 16px;
     border-radius: 8px;
     cursor: pointer;
     font-family: 'Tajawal', sans-serif;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     transition: all 0.2s;
     display: inline-flex; align-items: center; gap: 8px;
+    width: 100%;
+    justify-content: center;
   }
-  .btn:hover { background: var(--border-color); transform: translateY(-1px); }
+  .btn:hover { background: var(--border-color); }
   .btn-primary { background: var(--accent); color: #111B21; border: none; font-weight: 700; }
   .btn-primary:hover { background: #1FB855; box-shadow: 0 4px 12px var(--accent-glow); }
-  .btn-success { background: var(--success); border: none; }
-  .btn-danger { background: var(--danger); border: none; }
-  .btn-warning { background: var(--warning); border: none; color: #111B21; }
+  .btn-warning { background: var(--warning); border: none; color: #111B21; font-weight: 700; }
   
-  .status { margin-top: 10px; font-size: 12px; min-height: 18px; color: var(--text-muted); }
+  .status { margin-top: 10px; font-size: 12px; min-height: 18px; color: var(--text-muted); text-align: center; }
   .status.ok { color: var(--success); }
   .status.err { color: var(--danger); }
 
-  .schedule-status { padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; display: inline-block; }
+  .schedule-status { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; display: inline-block; margin-bottom: 10px; }
   .schedule-status.active { background: rgba(37, 211, 102, 0.15); color: var(--success); border: 1px solid rgba(37, 211, 102, 0.3); }
   .schedule-status.inactive { background: rgba(241, 92, 109, 0.15); color: var(--danger); border: 1px solid rgba(241, 92, 109, 0.3); }
   
-  .schedule-inputs { display: flex; gap: 12px; margin-bottom: 16px; }
-  .schedule-inputs label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--text-muted); }
+  .schedule-inputs { display: flex; gap: 12px; margin-bottom: 12px; justify-content: center; }
+  .schedule-inputs label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--text-muted); align-items: center; }
   .schedule-inputs input {
-    width: 80px; background: var(--input-bg); color: var(--text-main);
-    border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; text-align: center;
+    width: 70px; background: var(--input-bg); color: var(--text-main);
+    border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; text-align: center;
     font-family: 'Tajawal'; font-size: 16px;
   }
 
@@ -159,8 +191,8 @@ export const HTML_PAGE = `<!DOCTYPE html>
 
   .image-item {
     position: relative;
-    width: 100px;
-    height: 100px;
+    width: 90px;
+    height: 90px;
     border-radius: 8px;
     overflow: hidden;
     border: 1px solid var(--border-color);
@@ -168,143 +200,148 @@ export const HTML_PAGE = `<!DOCTYPE html>
   }
   .image-item img { width: 100%; height: 100%; object-fit: cover; }
   .image-item .delete-btn {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    background: var(--danger);
-    border: none;
-    color: white;
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-    transition: transform 0.2s;
+    position: absolute; top: 4px; right: 4px;
+    background: var(--danger); border: none; color: white;
+    border-radius: 50%; width: 24px; height: 24px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
   }
-  .image-item .delete-btn:hover { transform: scale(1.1); }
   #imageGallery { margin-top: 16px; }
   #imageList { display: flex; flex-wrap: wrap; gap: 12px; }
 </style>
 </head>
 <body>
-<div class="container">
-  <div class="header">
-    <div class="logo-area">
+
+  <!-- ========= SIDEBAR ========= -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
       <div class="logo-icon"><i class="fab fa-whatsapp"></i></div>
-      <div class="logo-text">مدير <span>واتساب</span> برو</div>
-    </div>
-  </div>
-  
-  <div class="grid">
-    <div class="card">
-      <div class="card-header"><i class="fas fa-comment-dots"></i><h2>الرسائل</h2></div>
-      <div class="card-hint">كل رسالة في سطر، تُحفظ كـ JSON array</div>
-      <textarea id="messagesArea" placeholder="اكتب رسالة في كل سطر..."></textarea>
-      <div class="btn-row">
-        <button class="btn" id="loadMessagesBtn"><i class="fas fa-download"></i> تحميل</button>
-        <button class="btn btn-primary" id="saveMessagesBtn"><i class="fas fa-save"></i> حفظ</button>
-      </div>
-      <div class="status" id="messagesStatus"></div>
+      <div class="logo-text">مدير <span>واتساب</span></div>
     </div>
 
-    <div class="card">
-      <div class="card-header"><i class="fas fa-address-book"></i><h2>جهات الاتصال</h2></div>
-      <div class="card-hint">كل رقم في سطر، يُحفظ كـ JSON array</div>
-      <textarea id="contactsArea" placeholder="اكتب رقم في كل سطر..."></textarea>
-      <div class="btn-row">
-        <button class="btn" id="loadContactsBtn"><i class="fas fa-download"></i> تحميل</button>
-        <button class="btn btn-primary" id="saveContactsBtn"><i class="fas fa-save"></i> حفظ</button>
+    <div class="nav-cards">
+      <!-- Manual Run -->
+      <div class="sidebar-card">
+        <div class="card-header"><i class="fas fa-bolt"></i><h2>تشغيل يدوي</h2></div>
+        <div class="btn-row" style="margin-top: 12px;">
+          <button class="btn btn-primary" id="runWorkflowBtn"><i class="fas fa-play"></i> تشغيل الـ Workflow</button>
+        </div>
+        <div class="status" id="workflowStatus"></div>
       </div>
-      <div class="status" id="contactsStatus"></div>
+
+      <!-- Logs -->
+      <div class="sidebar-card">
+        <div class="card-header"><i class="fas fa-terminal"></i><h2>السجلات</h2></div>
+        <div class="btn-row" style="margin-top: 12px;">
+          <button class="btn" id="viewLogsBtn"><i class="fas fa-folder-open"></i> عرض السجلات</button>
+        </div>
+        <div class="status" id="logsStatus"></div>
+      </div>
+
+      <!-- Schedule -->
+      <div class="sidebar-card">
+        <div class="card-header"><i class="fas fa-clock"></i><h2>الجدولة</h2></div>
+        <div class="card-hint">وقت المغرب (-2 ساعة UTC)</div>
+        <div>
+          <span class="schedule-status inactive" id="scheduleIndicator">غير مفعل</span>
+          <span id="currentCronDisplay" style="font-size:12px;color:var(--text-muted);display:block;margin-top:5px;"></span>
+        </div>
+        <div class="schedule-inputs">
+          <label>الساعة<input type="number" id="hourInput" min="0" max="23" value="10" /></label>
+          <label>الدقيقة<input type="number" id="minuteInput" min="0" max="59" value="0" /></label>
+        </div>
+        <div class="btn-row">
+          <button class="btn" id="loadScheduleBtn"><i class="fas fa-history"></i> تحميل</button>
+          <button class="btn btn-warning" id="updateScheduleBtn"><i class="fas fa-sync-alt"></i> تحديث</button>
+        </div>
+        <div class="status" id="scheduleStatus"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ========= MAIN CONTENT ========= -->
+  <main class="main-content">
+    
+    <!-- Statistics Card (Full Width) -->
+    <div class="card">
+      <div class="card-header"><i class="fas fa-chart-line"></i><h2>إحصائيات الإرسال</h2></div>
+      <div class="btn-row" style="margin-top: 0; margin-bottom: 16px;">
+        <button class="btn btn-primary" id="loadStatsBtn" style="width: auto;"><i class="fas fa-database"></i> تحميل الإحصائيات</button>
+      </div>
+      <div id="statsContainer" style="display:none;">
+        <div style="max-height: 250px; overflow-y: auto; margin-bottom: 20px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <table class="stats-table">
+            <thead><tr><th>التاريخ</th><th>محاولات</th><th>نجاح</th><th>فشل</th></tr></thead>
+            <tbody id="statsBody"></tbody>
+          </table>
+        </div>
+        <div style="background: var(--bg-main); border-radius: 8px; padding: 20px; height: 300px;">
+          <canvas id="statsChart"></canvas>
+        </div>
+      </div>
+      <div class="status" id="statsStatus"></div>
     </div>
 
-    <div class="card">
-      <div class="card-header"><i class="fas fa-clock"></i><h2>توقيت التشغيل التلقائي</h2></div>
-      <div class="card-hint">تعديل جدولة الـ workflow - الوقت المدخل بتوقيت المغرب (يُطرح ساعتين لتخزينه في UTC)</div>
-      <div style="margin-bottom: 15px;">
-        <span class="schedule-status inactive" id="scheduleIndicator">غير مفعل</span>
-        <span id="currentCronDisplay" style="font-size:12px;color:var(--text-muted);margin-right:10px;"></span>
+    <div class="content-grid">
+      <!-- Messages Card -->
+      <div class="card">
+        <div class="card-header"><i class="fas fa-comment-dots"></i><h2>الرسائل</h2></div>
+        <div class="card-hint">كل رسالة في سطر</div>
+        <textarea id="messagesArea" placeholder="اكتب رسالة في كل سطر..."></textarea>
+        <div class="btn-row">
+          <button class="btn" id="loadMessagesBtn"><i class="fas fa-download"></i> تحميل</button>
+          <button class="btn btn-primary" id="saveMessagesBtn"><i class="fas fa-save"></i> حفظ</button>
+        </div>
+        <div class="status" id="messagesStatus"></div>
       </div>
-      <div class="schedule-inputs">
-        <label>الساعة (0-23)<input type="number" id="hourInput" min="0" max="23" value="10" /></label>
-        <label>الدقيقة (0-59)<input type="number" id="minuteInput" min="0" max="59" value="0" /></label>
+
+      <!-- Contacts Card -->
+      <div class="card">
+        <div class="card-header"><i class="fas fa-address-book"></i><h2>جهات الاتصال</h2></div>
+        <div class="card-hint">كل رقم في سطر</div>
+        <textarea id="contactsArea" placeholder="اكتب رقم في كل سطر..."></textarea>
+        <div class="btn-row">
+          <button class="btn" id="loadContactsBtn"><i class="fas fa-download"></i> تحميل</button>
+          <button class="btn btn-primary" id="saveContactsBtn"><i class="fas fa-save"></i> حفظ</button>
+        </div>
+        <div class="status" id="contactsStatus"></div>
       </div>
-      <div class="btn-row">
-        <button class="btn" id="loadScheduleBtn"><i class="fas fa-history"></i> تحميل حالي</button>
-        <button class="btn btn-warning" id="updateScheduleBtn"><i class="fas fa-sync-alt"></i> تحديث</button>
-      </div>
-      <div class="status" id="scheduleStatus"></div>
     </div>
 
+    <!-- Images Card (Full Width under grid) -->
     <div class="card">
       <div class="card-header"><i class="fas fa-images"></i><h2>رفع الصور</h2></div>
-      <div class="card-hint">ستُرفع إلى مجلد <code>images/</code> - الحد الأقصى 3 صور</div>
-      <div style="background: var(--input-bg); padding: 15px; border-radius: 8px; border: 1px dashed var(--border-color);">
+      <div class="card-hint">الحد الأقصى 3 صور</div>
+      <div style="background: var(--bg-main); padding: 15px; border-radius: 8px; border: 1px dashed var(--border-color);">
         <input type="file" id="imagesInput" accept="image/*" multiple style="width:100%; margin-bottom: 10px;" />
         <div id="imagePreviewArea" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
       </div>
-      <div class="btn-row">
-        <button class="btn btn-primary" id="uploadImagesBtn"><i class="fas fa-upload"></i> رفع الصور</button>
-        <button class="btn" id="refreshImagesBtn"><i class="fas fa-sync"></i> تحديث القائمة</button>
+      <div class="btn-row" style="justify-content: flex-start;">
+        <button class="btn btn-primary" id="uploadImagesBtn" style="width: auto;"><i class="fas fa-upload"></i> رفع الصور</button>
+        <button class="btn" id="refreshImagesBtn" style="width: auto;"><i class="fas fa-sync"></i> تحديث القائمة</button>
       </div>
       <div id="imageGallery" style="display: none; margin-top: 16px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="margin-bottom:10px;">
           <span style="font-size:14px; color:var(--text-muted);">الصور الموجودة (<span id="imageCount">0</span>/3)</span>
         </div>
         <div id="imageList"></div>
       </div>
       <div class="status" id="imagesStatus"></div>
     </div>
-  </div>
 
-  <div class="card" style="margin-top: 20px;">
-    <div class="card-header"><i class="fas fa-chart-line"></i><h2>إحصائيات الإرسال</h2></div>
-    <div class="card-hint">عرض تقرير المحاولات والنجاح والفشل مع رسم بياني تفاعلي</div>
-    <button class="btn btn-primary" id="loadStatsBtn"><i class="fas fa-database"></i> تحميل الإحصائيات</button>
-    <div id="statsContainer" style="display:none; margin-top: 20px;">
-      <div style="max-height: 300px; overflow-y: auto; margin-bottom: 20px; border-radius: 8px; border: 1px solid var(--border-color);">
-        <table class="stats-table">
-          <thead><tr><th>التاريخ</th><th>محاولات</th><th>نجاح</th><th>فشل</th></tr></thead>
-          <tbody id="statsBody"></tbody>
-        </table>
-      </div>
-      <div style="background: var(--input-bg); border-radius: 8px; padding: 20px; height: 350px;">
-        <canvas id="statsChart"></canvas>
-      </div>
-    </div>
-    <div class="status" id="statsStatus"></div>
-  </div>
+  </main>
 
-  <div class="grid" style="margin-top: 20px; grid-template-columns: 2fr 1fr;">
-    <div class="card">
-      <div class="card-header"><i class="fas fa-terminal"></i><h2>سجلات التشغيل</h2></div>
-      <div class="btn-row">
-        <button class="btn" id="viewLogsBtn"><i class="fas fa-folder-open"></i> عرض السجلات</button>
+  <!-- ========= MODALS ========= -->
+  <div class="modal-overlay" id="logsModal">
+    <div class="modal">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="color: var(--accent);"><i class="fas fa-clipboard-list"></i> السجلات</h2>
+        <button class="btn" id="closeLogsModal" style="width: auto;"><i class="fas fa-times"></i> إغلاق</button>
       </div>
-      <div class="status" id="logsStatus"></div>
-    </div>
-    <div class="card" style="display: flex; flex-direction: column; justify-content: center; align-items: center;">
-      <div class="card-header" style="margin-bottom: 15px;"><i class="fas fa-bolt"></i><h2>تشغيل يدوي</h2></div>
-      <button class="btn btn-primary" id="runWorkflowBtn" style="width: 100%; justify-content: center; padding: 15px;"><i class="fas fa-play"></i> تشغيل الـ Workflow</button>
-      <div class="status" id="workflowStatus" style="text-align: center;"></div>
+      <div class="log-files-list" id="logFilesList"></div>
+      <div class="log-content" id="logContent">اختر ملف سجل لعرض محتواه...</div>
     </div>
   </div>
-</div>
-
-<div class="modal-overlay" id="logsModal">
-  <div class="modal">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <h2 style="color: var(--accent);"><i class="fas fa-clipboard-list"></i> السجلات</h2>
-      <button class="btn" id="closeLogsModal"><i class="fas fa-times"></i></button>
-    </div>
-    <div class="log-files-list" id="logFilesList"></div>
-    <div class="log-content" id="logContent">اختر ملف سجل لعرض محتواه...</div>
-  </div>
-</div>
 
 <script>
 function setStatus(el, msg, type) { el.textContent = msg; el.className = "status" + (type ? " " + type : ""); }
@@ -522,7 +559,7 @@ async function saveSchedule(cron) {
     const res = await fetch("/api/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add", cron: cron }) });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error);
-    setStatus(scheduleStatus, "تم التحديث ✓ (" + cron + ")", "ok");
+    setStatus(scheduleStatus, "تم التحديث ✓", "ok");
     loadSchedule();
   } catch (err) { setStatus(scheduleStatus, "خطأ: " + err.message, "err"); }
 }
@@ -531,7 +568,7 @@ document.getElementById("updateScheduleBtn").onclick = function() {
   const h = parseInt(hourInput.value, 10);
   const m = parseInt(minuteInput.value, 10);
   if (isNaN(h) || h < 0 || h > 23 || isNaN(m) || m < 0 || m > 59) {
-    setStatus(scheduleStatus, "أدخل قيم صحيحة (0-23 ساعة، 0-59 دقيقة)", "err");
+    setStatus(scheduleStatus, "أدخل قيم صحيحة", "err");
     return;
   }
   const cron = m + " " + h + " * * *";
