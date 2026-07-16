@@ -1,11 +1,9 @@
-// worker.js - المدخل الرئيسي
 import { HTML_PAGE } from './src/html.js';
-
-
-import { 
+import {
   handleLoad,
   handleSave,
   handleRunWorkflow,
+  handleWorkflowLogs,
   handleUploadImage,
   handleGetLogs,
   handleGetLogContent,
@@ -13,9 +11,8 @@ import {
   handleLoadSchedule,
   handleSaveSchedule,
   handleListImages,
-  handleDeleteImage   // استيراد الجديد
+  handleDeleteImage
 } from './src/handlers.js';
-
 
 export default {
   async fetch(request, env) {
@@ -27,16 +24,15 @@ export default {
     if (url.pathname === "/api/load" && request.method === "GET") return handleLoad(request, env);
     if (url.pathname === "/api/save" && request.method === "POST") return handleSave(request, env);
     if (url.pathname === "/api/run-workflow" && request.method === "POST") return handleRunWorkflow(request, env);
+    if (url.pathname === "/api/workflow-logs" && request.method === "GET") return handleWorkflowLogs(request, env);
     if (url.pathname === "/api/upload-image" && request.method === "POST") return handleUploadImage(request, env);
     if (url.pathname === "/api/logs" && request.method === "GET") return handleGetLogs(request, env);
     if (url.pathname === "/api/log-content" && request.method === "GET") return handleGetLogContent(request, env);
     if (url.pathname === "/api/schedule" && request.method === "GET") return handleLoadSchedule(request, env);
     if (url.pathname === "/api/schedule" && request.method === "POST") return handleSaveSchedule(request, env);
     if (url.pathname === "/api/stats" && request.method === "GET") return handleGetStats(request, env);
-    // داخل fetch
     if (url.pathname === "/api/images" && request.method === "GET") return handleListImages(request, env);
     if (url.pathname === "/api/delete-image" && request.method === "POST") return handleDeleteImage(request, env);
-
 
     return new Response("Not found", { status: 404 });
   }
