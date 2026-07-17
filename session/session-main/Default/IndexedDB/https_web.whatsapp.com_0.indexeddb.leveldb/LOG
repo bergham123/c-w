@@ -1,28 +1,3 @@
-2026/07/17-15:17:04.777 b3d Reusing MANIFEST /home/runner/work/wtsc/wtsc/session/session-main/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2026/07/17-15:17:04.778 b3d Recovering log #340
-2026/07/17-15:17:04.787 b3d Reusing old log /home/runner/work/wtsc/wtsc/session/session-main/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000340.log 
-2026/07/17-15:19:59.195 b44 Level-0 table #354: started
-2026/07/17-15:19:59.208 b44 Level-0 table #354: 1708401 bytes OK
-2026/07/17-15:19:59.210 b44 Delete type=0 #340
-2026/07/17-15:20:04.061 b3f Compacting 1@1 + 9@2 files
-2026/07/17-15:20:04.109 b3f Generated table #355@1: 65914 keys, 2283456 bytes
-2026/07/17-15:20:04.122 b3f Generated table #356@1: 3298 keys, 2143601 bytes
-2026/07/17-15:20:04.135 b3f Generated table #357@1: 2017 keys, 2147198 bytes
-2026/07/17-15:20:04.150 b3f Generated table #358@1: 2307 keys, 2148433 bytes
-2026/07/17-15:20:04.178 b3f Generated table #359@1: 19130 keys, 2210350 bytes
-2026/07/17-15:20:04.212 b3f Generated table #360@1: 23327 keys, 2255074 bytes
-2026/07/17-15:20:04.231 b3f Generated table #361@1: 14916 keys, 2159323 bytes
-2026/07/17-15:20:04.267 b3f Generated table #362@1: 65856 keys, 2205926 bytes
-2026/07/17-15:20:04.310 b3f Generated table #363@1: 88819 keys, 2181970 bytes
-2026/07/17-15:20:04.310 b3f Compacted 1@1 + 9@2 files => 19735331 bytes
-2026/07/17-15:20:04.310 b3f compacted to: files[ 0 0 10 0 0 0 0 ]
-2026/07/17-15:20:04.310 b3f Delete type=2 #350
-2026/07/17-15:20:04.310 b3f Delete type=2 #349
-2026/07/17-15:20:04.310 b3f Delete type=2 #347
-2026/07/17-15:20:04.310 b3f Delete type=2 #342
-2026/07/17-15:20:04.311 b3f Delete type=2 #346
-2026/07/17-15:20:04.311 b3f Delete type=2 #348
-2026/07/17-15:20:04.311 b3f Delete type=2 #354
-2026/07/17-15:20:04.311 b3f Delete type=2 #345
-2026/07/17-15:20:04.311 b3f Delete type=2 #344
-2026/07/17-15:20:04.311 b3f Delete type=2 #343
+2026/07/17-15:48:00.591 b3b Reusing MANIFEST /home/runner/work/wtsc/wtsc/session/session-main/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/07/17-15:48:00.591 b3b Recovering log #353
+2026/07/17-15:48:00.592 b3b Reusing old log /home/runner/work/wtsc/wtsc/session/session-main/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000353.log 

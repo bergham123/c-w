@@ -1,40 +1,28 @@
-2026/07/16-20:42:25.561 b74 Reusing MANIFEST /home/runner/work/wtsc/wtsc/session/session-main/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2026/07/16-20:42:25.562 b74 Recovering log #327
-2026/07/16-20:42:25.673 b74 Reusing old log /home/runner/work/wtsc/wtsc/session/session-main/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000327.log 
-2026/07/16-20:42:25.673 b74 Delete type=2 #323
-2026/07/16-20:42:25.673 b74 Delete type=2 #319
-2026/07/16-20:42:25.673 b74 Delete type=2 #321
-2026/07/16-20:42:25.673 b74 Delete type=2 #326
-2026/07/16-20:42:25.673 b74 Delete type=2 #318
-2026/07/16-20:42:25.673 b74 Delete type=2 #322
-2026/07/16-20:42:25.673 b74 Delete type=2 #324
-2026/07/16-20:42:25.673 b74 Delete type=2 #320
-2026/07/16-20:42:25.673 b74 Delete type=2 #325
-2026/07/16-20:42:25.673 b74 Delete type=2 #328
-2026/07/16-20:42:28.014 b72 Level-0 table #341: started
-2026/07/16-20:42:28.027 b72 Level-0 table #341: 1150173 bytes OK
-2026/07/16-20:42:28.029 b72 Delete type=0 #327
-2026/07/16-20:42:28.224 b7a Compacting 1@1 + 10@2 files
-2026/07/16-20:42:28.325 b7a Generated table #342@1: 65029 keys, 2262889 bytes
-2026/07/16-20:42:28.343 b7a Generated table #343@1: 1868 keys, 2147407 bytes
-2026/07/16-20:42:28.366 b7a Generated table #344@1: 2098 keys, 2147795 bytes
-2026/07/16-20:42:28.385 b7a Generated table #345@1: 2126 keys, 2147202 bytes
-2026/07/16-20:42:28.421 b7a Generated table #346@1: 18200 keys, 2205488 bytes
-2026/07/16-20:42:28.467 b7a Generated table #347@1: 24066 keys, 2256492 bytes
-2026/07/16-20:42:28.488 b7a Generated table #348@1: 14389 keys, 2161651 bytes
-2026/07/16-20:42:28.528 b7a Generated table #349@1: 62468 keys, 2199900 bytes
-2026/07/16-20:42:28.586 b7a Generated table #350@1: 92529 keys, 2261344 bytes
-2026/07/16-20:42:28.586 b7a Generated table #351@1: 11 keys, 660 bytes
-2026/07/16-20:42:28.587 b7a Compacted 1@1 + 10@2 files => 19790828 bytes
-2026/07/16-20:42:28.587 b7a compacted to: files[ 0 0 10 0 0 0 0 ]
-2026/07/16-20:42:28.587 b7a Delete type=2 #333
-2026/07/16-20:42:28.587 b7a Delete type=2 #337
-2026/07/16-20:42:28.587 b7a Delete type=2 #335
-2026/07/16-20:42:28.587 b7a Delete type=2 #332
-2026/07/16-20:42:28.587 b7a Delete type=2 #336
-2026/07/16-20:42:28.588 b7a Delete type=2 #329
-2026/07/16-20:42:28.588 b7a Delete type=2 #334
-2026/07/16-20:42:28.588 b7a Delete type=2 #341
-2026/07/16-20:42:28.588 b7a Delete type=2 #338
-2026/07/16-20:42:28.588 b7a Delete type=2 #331
-2026/07/16-20:42:28.588 b7a Delete type=2 #330
+2026/07/17-15:17:04.777 b3d Reusing MANIFEST /home/runner/work/wtsc/wtsc/session/session-main/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/07/17-15:17:04.778 b3d Recovering log #340
+2026/07/17-15:17:04.787 b3d Reusing old log /home/runner/work/wtsc/wtsc/session/session-main/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000340.log 
+2026/07/17-15:19:59.195 b44 Level-0 table #354: started
+2026/07/17-15:19:59.208 b44 Level-0 table #354: 1708401 bytes OK
+2026/07/17-15:19:59.210 b44 Delete type=0 #340
+2026/07/17-15:20:04.061 b3f Compacting 1@1 + 9@2 files
+2026/07/17-15:20:04.109 b3f Generated table #355@1: 65914 keys, 2283456 bytes
+2026/07/17-15:20:04.122 b3f Generated table #356@1: 3298 keys, 2143601 bytes
+2026/07/17-15:20:04.135 b3f Generated table #357@1: 2017 keys, 2147198 bytes
+2026/07/17-15:20:04.150 b3f Generated table #358@1: 2307 keys, 2148433 bytes
+2026/07/17-15:20:04.178 b3f Generated table #359@1: 19130 keys, 2210350 bytes
+2026/07/17-15:20:04.212 b3f Generated table #360@1: 23327 keys, 2255074 bytes
+2026/07/17-15:20:04.231 b3f Generated table #361@1: 14916 keys, 2159323 bytes
+2026/07/17-15:20:04.267 b3f Generated table #362@1: 65856 keys, 2205926 bytes
+2026/07/17-15:20:04.310 b3f Generated table #363@1: 88819 keys, 2181970 bytes
+2026/07/17-15:20:04.310 b3f Compacted 1@1 + 9@2 files => 19735331 bytes
+2026/07/17-15:20:04.310 b3f compacted to: files[ 0 0 10 0 0 0 0 ]
+2026/07/17-15:20:04.310 b3f Delete type=2 #350
+2026/07/17-15:20:04.310 b3f Delete type=2 #349
+2026/07/17-15:20:04.310 b3f Delete type=2 #347
+2026/07/17-15:20:04.310 b3f Delete type=2 #342
+2026/07/17-15:20:04.311 b3f Delete type=2 #346
+2026/07/17-15:20:04.311 b3f Delete type=2 #348
+2026/07/17-15:20:04.311 b3f Delete type=2 #354
+2026/07/17-15:20:04.311 b3f Delete type=2 #345
+2026/07/17-15:20:04.311 b3f Delete type=2 #344
+2026/07/17-15:20:04.311 b3f Delete type=2 #343
