@@ -7,11 +7,6 @@ export function ghHeaders(env) {
   };
 }
 
-export function getImagesListPath(env) {
-  return env.IMAGES_LIST_PATH || "images.json";
-}
-
-// تعديل getPath ليدعم "images"
 export function getPath(env, type) {
   if (type === "messages") return env.MESSAGES_PATH || "message.json";
   if (type === "contacts") return env.CONTACTS_PATH || "accounts.json";
@@ -26,6 +21,10 @@ export function getWorkflowPath(env) {
 
 export function getImagesDir(env) {
   return (env.IMAGES_DIR || "images").replace(/^\/+|\/+$/g, "");
+}
+
+export function getImagesListPath(env) {
+  return env.IMAGES_LIST_PATH || "images.json";
 }
 
 export function utf8ToBase64(str) {
@@ -50,8 +49,4 @@ export function jsonToLines(jsonStr) {
     if (Array.isArray(parsed)) return parsed.map(item => typeof item === "string" ? item : JSON.stringify(item)).join("\n");
     return JSON.stringify(parsed, null, 2);
   } catch (e) { return jsonStr; }
-}
-
-export function getImagesListPath(env) {
-  return env.IMAGES_LIST_PATH || "images.json";
 }
