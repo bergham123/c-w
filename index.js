@@ -1,5 +1,5 @@
 import pkg from "whatsapp-web.js";
-const { Client, LocalAuth } = pkg;
+const { Client, LocalAuth, MessageMedia } = pkg;
 
 import qrcode from "qrcode-terminal";
 import fs from "fs-extra";
@@ -12,6 +12,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ACCOUNTS_FILE = "./accounts.json";
 const MESSAGE_FILE = "./message.txt";          // للتوافق القديم
 const MESSAGES_FILE = "./message.json";        // الملف الجديد للرسائل المتعددة
+const IMAGES_LIST_FILE = "./images.json";      // قائمة الصور
 const DASHBOARD_DIR = "./dashboard";
 const SESSION_DIR = "./session";
 const LOGS_DIR = "./logs";
@@ -156,6 +157,24 @@ client.on("ready", async () => {
   // عرض أول 3 رسائل كمثال
   logMessage(`📌 نماذج من الرسائل: ${messages.slice(0, 3).join(" | ")}${messages.length > 3 ? " ..." : ""}`);
 
+  // ========== قراءة قائمة الصور ==========
+  let imagePaths = [];
+  if (await fs.pathExists(IMAGES_LIST_FILE)) {
+    try {
+      const data = await fs.readJson(IMAGES_LIST_FILE);
+      if (Array.isArray(data) && data.length > 0) {
+        imagePaths = data.filter(p => typeof p === "string" && p.trim().length > 0);
+        logMessage(`🖼️ تم تحميل ${imagePaths.length} صورة من images.json`);
+      } else {
+        logMessage(`⚠️ images.json موجود لكن لا يحتوي على صور صالحة`);
+      }
+    } catch (err) {
+      logMessage(`⚠️ فشل قراءة images.json: ${err.message}`);
+    }
+  } else {
+    logMessage(`ℹ️ لا يوجد ملف images.json، سيتم إرسال النص فقط`);
+  }
+
   // ========== تحديد نقطة البداية ==========
   let startIndex = 0;
   if (checkpoint.lastIndex < cleanNumbers.length) {
@@ -181,13 +200,19 @@ client.on("ready", async () => {
       continue;
     }
 
-    // اختيار الرسالة
+    // اختيار الرسالة النصية
     let currentMessage;
     if (messageMode === "random") {
       currentMessage = messages[Math.floor(Math.random() * messages.length)];
     } else { // sequential
       currentMessage = messages[messageCounter % messages.length];
       messageCounter++;
+    }
+
+    // اختيار صورة عشوائية (إن وجدت)
+    let selectedImagePath = null;
+    if (imagePaths.length > 0) {
+      selectedImagePath = imagePaths[Math.floor(Math.random() * imagePaths.length)];
     }
 
     let success = false;
@@ -201,7 +226,30 @@ client.on("ready", async () => {
           break;
         }
 
-        await client.sendMessage(chatId, currentMessage);
+        // إرسال الصورة مع النص إذا وجدت صورة
+        if (selectedImagePath) {
+          try {
+            // المسار الكامل للصورة (نفترض أن المجلد images/ موجود بنفس مستوى السكربت)
+            const fullPath = path.join(__dirname, selectedImagePath);
+            if (await fs.pathExists(fullPath)) {
+              const media = MessageMedia.fromFilePath(fullPath);
+              await client.sendMessage(chatId, media, { caption: currentMessage });
+              logMessage(`🖼️ تم إرسال صورة + نص إلى ${rawNumber}`);
+            } else {
+              // إذا لم يكن الملف موجوداً، أرسل النص فقط
+              logMessage(`⚠️ الصورة ${selectedImagePath} غير موجودة، إرسال نص فقط`);
+              await client.sendMessage(chatId, currentMessage);
+            }
+          } catch (imgErr) {
+            // في حال فشل إرسال الصورة، حاول إرسال النص فقط
+            logMessage(`⚠️ فشل إرسال الصورة: ${imgErr.message}، إرسال نص فقط`);
+            await client.sendMessage(chatId, currentMessage);
+          }
+        } else {
+          // لا توجد صور، أرسل النص فقط
+          await client.sendMessage(chatId, currentMessage);
+        }
+
         success = true;
 
         dashboard.attempted++;
@@ -269,7 +317,8 @@ client.on("ready", async () => {
 📌 المرسلة: ${dashboard.sent.length} رقم
 ❌ الفاشلة: ${dashboard.failedList.join(", ") || "لا يوجد"}
 📝 عدد الرسائل المستخدمة: ${messages.length}
-🔄 وضع الاختيار: ${messageMode}
+🖼️ عدد الصور المتاحة: ${imagePaths.length}
+🔄 وضع اختيار الرسالة: ${messageMode}
 `;
 
   const adminChatId = `${ADMIN_NUMBER}@c.us`;
