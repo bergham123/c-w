@@ -1,3 +1,3 @@
-2026/07/17-16:12:03.185 b2b Reusing MANIFEST /home/runner/work/wtsc/wtsc/session/session-main/Default/Sync Data/LevelDB/MANIFEST-000001
-2026/07/17-16:12:03.190 b2b Recovering log #3
-2026/07/17-16:12:03.190 b2b Reusing old log /home/runner/work/wtsc/wtsc/session/session-main/Default/Sync Data/LevelDB/000003.log 
+2026/07/17-16:26:06.235 afd Reusing MANIFEST /home/runner/work/wtsc/wtsc/session/session-main/Default/Sync Data/LevelDB/MANIFEST-000001
+2026/07/17-16:26:06.238 afd Recovering log #3
+2026/07/17-16:26:06.238 afd Reusing old log /home/runner/work/wtsc/wtsc/session/session-main/Default/Sync Data/LevelDB/000003.log 

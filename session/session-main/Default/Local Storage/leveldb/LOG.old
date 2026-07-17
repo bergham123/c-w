@@ -1,3 +1,5 @@
-2026/07/17-16:12:03.198 b52 Reusing MANIFEST /home/runner/work/wtsc/wtsc/session/session-main/Default/Local Storage/leveldb/MANIFEST-000001
-2026/07/17-16:12:03.205 b52 Recovering log #4
-2026/07/17-16:12:03.205 b52 Reusing old log /home/runner/work/wtsc/wtsc/session/session-main/Default/Local Storage/leveldb/000004.log 
+2026/07/17-16:26:06.258 b23 Reusing MANIFEST /home/runner/work/wtsc/wtsc/session/session-main/Default/Local Storage/leveldb/MANIFEST-000001
+2026/07/17-16:26:06.264 b23 Recovering log #4
+2026/07/17-16:26:06.264 b23 Level-0 table #7: started
+2026/07/17-16:26:06.270 b23 Level-0 table #7: 14117 bytes OK
+2026/07/17-16:26:06.279 b23 Delete type=0 #4

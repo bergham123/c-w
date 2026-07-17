@@ -1,19 +1,13 @@
-2026/07/17-16:26:06.809 afd Reusing MANIFEST /home/runner/work/wtsc/wtsc/session/session-main/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2026/07/17-16:26:06.810 afd Recovering log #353
-2026/07/17-16:26:06.861 afd Reusing old log /home/runner/work/wtsc/wtsc/session/session-main/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000353.log 
-2026/07/17-16:26:09.601 b02 Level-0 table #366: started
-2026/07/17-16:26:09.629 b02 Level-0 table #366: 1707629 bytes OK
-2026/07/17-16:26:09.630 b02 Delete type=0 #353
-2026/07/17-16:26:09.742 afd Compacting 1@1 + 9@2 files
-2026/07/17-16:26:10.026 afd Generated table #367@1: 66941 keys, 2291269 bytes
-2026/07/17-16:26:10.046 afd Generated table #368@1: 4978 keys, 2150292 bytes
-2026/07/17-16:26:10.065 afd Generated table #369@1: 1965 keys, 2145518 bytes
-2026/07/17-16:26:10.097 afd Generated table #370@1: 2337 keys, 2150780 bytes
-2026/07/17-16:26:10.143 afd Generated table #371@1: 17341 keys, 2200235 bytes
-2026/07/17-16:26:10.206 afd Generated table #372@1: 24894 keys, 2262030 bytes
-2026/07/17-16:26:10.237 afd Generated table #373@1: 13939 keys, 2160578 bytes
-2026/07/17-16:26:10.280 afd Generated table #374@1: 57401 keys, 2195846 bytes
-2026/07/17-16:26:10.340 afd Generated table #375@1: 97446 keys, 2248632 bytes
-2026/07/17-16:26:10.343 afd Generated table #376@1: 1741 keys, 171885 bytes
-2026/07/17-16:26:10.343 afd Compacted 1@1 + 9@2 files => 19977065 bytes
-2026/07/17-16:26:10.344 afd compacted to: files[ 0 0 11 0 0 0 0 ]
+2026/07/17-16:29:55.445 b55 Reusing MANIFEST /home/runner/work/wtsc/wtsc/session/session-main/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/07/17-16:29:55.446 b55 Recovering log #365
+2026/07/17-16:29:55.465 b55 Reusing old log /home/runner/work/wtsc/wtsc/session/session-main/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000365.log 
+2026/07/17-16:29:55.465 b55 Delete type=2 #359
+2026/07/17-16:29:55.465 b55 Delete type=2 #355
+2026/07/17-16:29:55.465 b55 Delete type=2 #356
+2026/07/17-16:29:55.465 b55 Delete type=2 #363
+2026/07/17-16:29:55.465 b55 Delete type=2 #361
+2026/07/17-16:29:55.465 b55 Delete type=2 #360
+2026/07/17-16:29:55.465 b55 Delete type=2 #366
+2026/07/17-16:29:55.465 b55 Delete type=2 #357
+2026/07/17-16:29:55.465 b55 Delete type=2 #362
+2026/07/17-16:29:55.465 b55 Delete type=2 #358
