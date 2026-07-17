@@ -10,9 +10,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // =================== ثوابت ===================
 const ACCOUNTS_FILE = "./accounts.json";
-const MESSAGE_FILE = "./message.txt";          // للتوافق القديم
-const MESSAGES_FILE = "./message.json";        // الملف الجديد للرسائل المتعددة
-const IMAGES_LIST_FILE = "./images.json";      // قائمة الصور
+const MESSAGE_FILE = "./message.txt";          
+const MESSAGES_FILE = "./message.json";        
+const IMAGES_LIST_FILE = "./images.json";      
 const DASHBOARD_DIR = "./dashboard";
 const SESSION_DIR = "./session";
 const LOGS_DIR = "./logs";
@@ -25,13 +25,13 @@ const RETRY_DELAY = 5000;
 const MIN_DELAY = 20000;
 const MAX_DELAY = 40000;
 
-// وضع اختيار الرسالة: "random" أو "sequential"
-const MESSAGE_MODE = "random"; // أو "sequential"
+const MESSAGE_MODE = "random"; 
 
 // =================== أدوات مساعدة ===================
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const randomDelay = () => MIN_DELAY + Math.floor(Math.random() * (MAX_DELAY - MIN_DELAY));
 const cleanNumber = (raw) => raw.replace(/\D/g, "");
+const isUrl = (str) => /^https?:\/\/\S+\.\S+/.test(str);
 
 // =================== تهيئة المجلدات ===================
 await fs.ensureDir(DASHBOARD_DIR);
@@ -124,7 +124,6 @@ client.on("ready", async () => {
   let messages = [];
   let messageMode = MESSAGE_MODE;
 
-  // محاولة تحميل message.json أولاً
   if (await fs.pathExists(MESSAGES_FILE)) {
     try {
       const data = await fs.readJson(MESSAGES_FILE);
@@ -139,7 +138,6 @@ client.on("ready", async () => {
     }
   }
 
-  // إذا لم توجد رسائل من JSON، نقرأ message.txt
   if (messages.length === 0) {
     if (!(await fs.pathExists(MESSAGE_FILE))) {
       logMessage("❌ لا يوجد message.txt ولا message.json صالح");
@@ -154,19 +152,18 @@ client.on("ready", async () => {
     logMessage(`📝 تم تحميل رسالة واحدة من message.txt`);
   }
 
-  // عرض أول 3 رسائل كمثال
   logMessage(`📌 نماذج من الرسائل: ${messages.slice(0, 3).join(" | ")}${messages.length > 3 ? " ..." : ""}`);
 
-  // ========== قراءة قائمة الصور ==========
-  let imagePaths = [];
+  // ========== قراءة قائمة الصور (قد تكون مسارات محلية أو روابط) ==========
+  let imageItems = [];
   if (await fs.pathExists(IMAGES_LIST_FILE)) {
     try {
       const data = await fs.readJson(IMAGES_LIST_FILE);
       if (Array.isArray(data) && data.length > 0) {
-        imagePaths = data.filter(p => typeof p === "string" && p.trim().length > 0);
-        logMessage(`🖼️ تم تحميل ${imagePaths.length} صورة من images.json`);
+        imageItems = data.filter(p => typeof p === "string" && p.trim().length > 0);
+        logMessage(`🖼️ تم تحميل ${imageItems.length} مدخل من images.json (قد تكون روابط أو مسارات محلية)`);
       } else {
-        logMessage(`⚠️ images.json موجود لكن لا يحتوي على صور صالحة`);
+        logMessage(`⚠️ images.json موجود لكن لا يحتوي على مدخلات صالحة`);
       }
     } catch (err) {
       logMessage(`⚠️ فشل قراءة images.json: ${err.message}`);
@@ -185,7 +182,6 @@ client.on("ready", async () => {
     logMessage(`🔄 بدء من البداية (الفهرس ${startIndex})`);
   }
 
-  // عداد لتوزيع الرسائل بالتتابع (إن اخترنا sequential)
   let messageCounter = 0;
 
   // ========== الحلقة الرئيسية ==========
@@ -204,15 +200,15 @@ client.on("ready", async () => {
     let currentMessage;
     if (messageMode === "random") {
       currentMessage = messages[Math.floor(Math.random() * messages.length)];
-    } else { // sequential
+    } else {
       currentMessage = messages[messageCounter % messages.length];
       messageCounter++;
     }
 
-    // اختيار صورة عشوائية (إن وجدت)
-    let selectedImagePath = null;
-    if (imagePaths.length > 0) {
-      selectedImagePath = imagePaths[Math.floor(Math.random() * imagePaths.length)];
+    // اختيار مدخل صورة عشوائي (إن وجد)
+    let selectedImageItem = null;
+    if (imageItems.length > 0) {
+      selectedImageItem = imageItems[Math.floor(Math.random() * imageItems.length)];
     }
 
     let success = false;
@@ -226,28 +222,40 @@ client.on("ready", async () => {
           break;
         }
 
-        // إرسال الصورة مع النص إذا وجدت صورة
-        if (selectedImagePath) {
+        // محاولة إرسال الصورة (إذا وجدت)
+        let mediaSent = false;
+        if (selectedImageItem) {
           try {
-            // المسار الكامل للصورة (نفترض أن المجلد images/ موجود بنفس مستوى السكربت)
-            const fullPath = path.join(__dirname, selectedImagePath);
-            if (await fs.pathExists(fullPath)) {
-              const media = MessageMedia.fromFilePath(fullPath);
-              await client.sendMessage(chatId, media, { caption: currentMessage });
-              logMessage(`🖼️ تم إرسال صورة + نص إلى ${rawNumber}`);
+            let media;
+            if (isUrl(selectedImageItem)) {
+              // رابط URL
+              logMessage(`🌐 محاولة تحميل صورة من رابط: ${selectedImageItem}`);
+              media = await MessageMedia.fromUrl(selectedImageItem);
             } else {
-              // إذا لم يكن الملف موجوداً، أرسل النص فقط
-              logMessage(`⚠️ الصورة ${selectedImagePath} غير موجودة، إرسال نص فقط`);
-              await client.sendMessage(chatId, currentMessage);
+              // مسار محلي
+              const fullPath = path.join(__dirname, selectedImageItem);
+              if (await fs.pathExists(fullPath)) {
+                media = MessageMedia.fromFilePath(fullPath);
+              } else {
+                logMessage(`⚠️ الملف المحلي غير موجود: ${fullPath}`);
+                throw new Error("Local file not found");
+              }
+            }
+            if (media) {
+              await client.sendMessage(chatId, media, { caption: currentMessage });
+              mediaSent = true;
+              logMessage(`🖼️ تم إرسال صورة + نص إلى ${rawNumber}`);
             }
           } catch (imgErr) {
-            // في حال فشل إرسال الصورة، حاول إرسال النص فقط
-            logMessage(`⚠️ فشل إرسال الصورة: ${imgErr.message}، إرسال نص فقط`);
-            await client.sendMessage(chatId, currentMessage);
+            logMessage(`⚠️ فشل إرسال الصورة (${selectedImageItem}): ${imgErr.message}`);
+            // سنحاول إرسال النص فقط
           }
-        } else {
-          // لا توجد صور، أرسل النص فقط
+        }
+
+        // إذا لم يتم إرسال الصورة، أرسل النص فقط
+        if (!mediaSent) {
           await client.sendMessage(chatId, currentMessage);
+          logMessage(`📝 تم إرسال نص فقط إلى ${rawNumber}`);
         }
 
         success = true;
@@ -317,7 +325,7 @@ client.on("ready", async () => {
 📌 المرسلة: ${dashboard.sent.length} رقم
 ❌ الفاشلة: ${dashboard.failedList.join(", ") || "لا يوجد"}
 📝 عدد الرسائل المستخدمة: ${messages.length}
-🖼️ عدد الصور المتاحة: ${imagePaths.length}
+🖼️ عدد مدخلات الصور: ${imageItems.length}
 🔄 وضع اختيار الرسالة: ${messageMode}
 `;
 
